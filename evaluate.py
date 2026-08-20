@@ -58,7 +58,9 @@ def run_single(graph, task: dict) -> dict:
 
     report = final.get("final_report", "")
     must = task.get("must_contain", [])
-    hits = [k for k in must if k in report]
+    # 大小写不敏感匹配（报告里可能写 LangGraph/CrewAI 而非 langgraph/crewAI）
+    report_lower = report.lower()
+    hits = [k for k in must if k.lower() in report_lower]
 
     return {
         "id": task["id"],

@@ -25,7 +25,16 @@ def writer_node(cfg: Config):
             f"研究笔记：\n{notes}"
         )
 
-        report = model([{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}]).content
-        return {"final_report": str(report), "status": "complete"}
+        # DeepSeek 偶发返回空 content：空/过短输出重试，最多 3 次
+        report = ""
+        for attempt in range(3):
+            raw = model([{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}]).content
+            report = str(raw or "").strip()
+            if len(report) >= 50:
+                break
+        if len(report) < 50:
+            # 兜底：直接输出研究笔记原文，保证报告不为空
+            report = f"（自动报告生成失败，以下为研究笔记原文）\n\n{notes[: cfg.max_report_length]}"
+        return {"final_report": report, "status": "complete"}
 
     return node
