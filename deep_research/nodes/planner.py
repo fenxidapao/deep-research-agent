@@ -1,0 +1,76 @@
+"""Planner 节点：把用户任务拆解为调研简报 + 步骤列表。"""
+
+import json
+import re
+from typing import Any
+
+from ..config import Config
+from ..prompts import PLANNER_SYSTEM_PROMPT, TODAY
+from ..state import PlanStep, ResearchState
+
+
+def _extract_json(text: str) -> dict[str, Any]:
+    """从模型输出中稳健提取 JSON（容忍代码块包裹 / 前后杂质）。"""
+    text = text.strip()
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if fence:
+        text = fence.group(1).strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError(f"输出中未找到 JSON 对象: {text[:200]}")
+    return json.loads(text[start : end + 1])
+
+
+def _as_model(cfg: Config):
+    """延迟导入避免循环依赖。"""
+    from ..model import build_model
+
+    return build_model(cfg)
+
+
+def planner_node(cfg: Config):
+    """返回 Planner 节点函数（闭包注入配置）。
+
+    首次规划：基于用户任务拆解。
+    重规划（Reflector 判定 replan 后）：基于已有研究进展调整计划，避免重复劳动。
+    """
+
+    def node(state: ResearchState) -> dict[str, Any]:
+        model = _as_model(cfg)
+        prompt = PLANNER_SYSTEM_PROMPT.format(today=TODAY, max_steps=cfg.max_plan_steps)
+
+        # 重规划场景：带上已有进展，要求新计划基于现状调整
+        existing = state.get("intermediate_results", [])
+        if existing:
+            user_msg = (
+                f"用户任务：\n{state['task']}\n\n"
+                f"原调研简报：{state.get('research_brief', state['task'])}\n\n"
+                f"已有研究进展（不可重复调研）：\n" + "\n\n".join(existing) + "\n\n"
+                f"请基于已有进展**重新规划**剩余步骤：只列出仍需调研的维度，跳过已完成内容。"
+            )
+        else:
+            user_msg = f"用户任务：\n{state['task']}\n\n请给出调研简报与步骤拆解。"
+
+        raw = model([{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}]).content
+        data = _extract_json(raw)
+
+        steps: list[PlanStep] = []
+        for i, s in enumerate(data.get("steps", []), 1):
+            steps.append(
+                {
+                    "id": int(s.get("id", i)),
+                    "description": str(s.get("description", "")),
+                    "queries": [str(q) for q in s.get("queries", [])],
+                }
+            )
+
+        return {
+            "research_brief": str(data.get("research_brief", state["task"])),
+            "plan": steps,
+            "current_step": 0,
+            "iteration": 0,
+            "status": "running",
+        }
+
+    return node

@@ -1,0 +1,21 @@
+{
+  "description": "Deep Research Agent 评测集。must_contain 为报告中必须出现的关键事实词，用于自动打分。",
+  "tasks": [
+    {"id": 1, "category": "对比", "task": "对比 DeepSeek-V3 与 OpenAI GPT-4o 的推理能力和 API 定价，给出选型建议", "must_contain": ["DeepSeek", "GPT-4o", "价格"]},
+    {"id": 2, "category": "事实", "task": "2024 年巴黎奥运会中国代表团获得多少枚金牌？在奖牌榜排名第几？", "must_contain": ["巴黎", "金牌", "40"]},
+    {"id": 3, "category": "兴趣", "task": "星露谷物语 1.6 版本更新了哪些主要内容？", "must_contain": ["星露谷", "1.6"]},
+    {"id": 4, "category": "技术", "task": "Python 3.13 版本的主要新特性有哪些？", "must_contain": ["3.13", "JIT"]},
+    {"id": 5, "category": "事实", "task": "小米 SU7 的上市时间和起售价格是多少？", "must_contain": ["小米", "SU7", "21.59"]},
+    {"id": 6, "category": "硬件", "task": "RTX 4060 笔记本显卡的显存容量和性能定位是怎样的？", "must_contain": ["4060", "8GB", "1080p"]},
+    {"id": 7, "category": "对比", "task": "对比 langgraph 与 crewAI 两个 Agent 编排框架的设计理念和适用场景", "must_contain": ["langgraph", "crewAI"]},
+    {"id": 8, "category": "事实", "task": "2024 年诺贝尔文学奖得主是谁？其代表作是什么？", "must_contain": ["韩江", "素食者"]},
+    {"id": 9, "category": "健康", "task": "世界卫生组织建议的成年人每日食盐摄入量上限是多少？", "must_contain": ["世卫", "5"]},
+    {"id": 10, "category": "航天", "task": "中国空间站的三个舱段分别叫什么名字？", "must_contain": ["天和", "问天", "梦天"]},
+    {"id": 11, "category": "金融", "task": "比特币最近一次减半发生在什么时候？减半后区块奖励是多少？", "must_contain": ["2024", "减半", "3.125"]},
+    {"id": 12, "category": "技术", "task": "通义千问 Qwen2.5 系列有哪些参数量档位？", "must_contain": ["Qwen2.5", "7B"]},
+    {"id": 13, "category": "对比", "task": "电动汽车电池中磷酸铁锂和三元锂电池各自的优缺点是什么？", "must_contain": ["磷酸铁锂", "三元"]},
+    {"id": 14, "category": "体育", "task": "2024 年巴黎奥运会新增了哪个首次亮相的正式比赛项目？", "must_contain": ["霹雳舞"]},
+    {"id": 15, "category": "事实", "task": "全球人口是什么时候突破 80 亿的？", "must_contain": ["2022", "80亿"]},
+    {"id": 16, "category": "航天", "task": "SpaceX 星舰 Starship 第四次试飞的最终结果如何？", "must_contain": ["星舰", "第四次"]}
+  ]
+}

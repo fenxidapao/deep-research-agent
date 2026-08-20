@@ -1,0 +1,18 @@
+# 编排层
+langgraph>=0.4.0
+
+# 内核层（CodeAgent）
+smolagents>=1.10.0
+litellm>=1.60.0
+
+# 搜索工具（bing 默认免费直连；tavily 需 key 可选）
+lxml>=5.0.0
+tavily-python>=0.5.0
+
+# 配置与接口
+python-dotenv>=1.0.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# 评测
+pytest>=8.0.0
