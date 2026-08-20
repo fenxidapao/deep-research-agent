@@ -7,15 +7,40 @@
 - 效率：平均执行步骤数 / 平均循环轮数 / 平均耗时
 - 断点恢复耗时：重跑同一 thread_id 到指定 checkpoint 的耗时（对比全量）
 
-用法：python evaluate.py [--limit N] [--resume-test]
+用法：python evaluate.py [--limit N] [--resume-test] [--fresh]
+断点续跑：每条结果实时写入 eval_set/progress.jsonl，中断后重跑自动跳过已完成任务；
+         加 --fresh 可清空进度重跑。
 """
 
 import argparse
 import json
+import os
 import sys
 import time
 
 from deep_research import build_graph, get_config
+
+PROGRESS_FILE = "eval_set/progress.jsonl"
+
+
+def load_progress() -> dict[int, dict]:
+    """读取已完成的任务结果（id -> result）。"""
+    done: dict[int, dict] = {}
+    if os.path.exists(PROGRESS_FILE):
+        with open(PROGRESS_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    r = json.loads(line)
+                    done[int(r["id"])] = r
+    return done
+
+
+def append_progress(r: dict) -> None:
+    """立即把一条结果追加到进度文件（原子单行写）。"""
+    os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
+    with open(PROGRESS_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
 def load_tasks(path: str) -> list[dict]:
@@ -80,7 +105,12 @@ def main():
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 条")
     parser.add_argument("--tasks", default="eval_set/tasks.json")
     parser.add_argument("--resume-test", action="store_true", help="附加断点恢复耗时测试")
+    parser.add_argument("--fresh", action="store_true", help="清空进度文件重跑全部")
     args = parser.parse_args()
+
+    if args.fresh and os.path.exists(PROGRESS_FILE):
+        os.remove(PROGRESS_FILE)
+        print("已清空进度文件\n")
 
     cfg = get_config()
     graph = build_graph(cfg)
@@ -88,15 +118,21 @@ def main():
     if args.limit:
         tasks = tasks[: args.limit]
 
-    print(f"评测集: {len(tasks)} 条 | provider={cfg.provider} search={cfg.search_provider}\n")
-    results = []
-    for i, t in enumerate(tasks, 1):
-        print(f"[{i}/{len(tasks)}] #{t['id']} [{t.get('category','')}] {t['task'][:40]}...")
+    done = load_progress()
+    pending = [t for t in tasks if t["id"] not in done]
+    print(f"评测集: {len(tasks)} 条 | provider={cfg.provider} search={cfg.search_provider} | "
+          f"已完成 {len(done)} 条，本次将跑 {len(pending)} 条\n")
+
+    results = list(done.values())  # 历史结果直接复用
+    for i, t in enumerate(pending, 1):
+        print(f"[{i}/{len(pending)}] #{t['id']} [{t.get('category','')}] {t['task'][:40]}...")
         r = run_single(graph, t)
         results.append(r)
+        append_progress(r)  # 立即落盘，中断不丢
         print(f"    -> 步骤 {r['executed_steps']}/{r['plan_steps']} | 轮数 {r['iterations']} | "
               f"命中 {r['hit_ratio']} | 耗时 {r['elapsed']}s | {r['status']}\n")
 
+    results.sort(key=lambda r: r["id"])
     metrics = summarize(results, max_plan_steps=cfg.max_plan_steps)
     if args.resume_test:
         metrics["断点恢复测试耗时(s)"] = resume_test(graph)

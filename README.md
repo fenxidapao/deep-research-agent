@@ -65,8 +65,9 @@ python main.py "对比 DeepSeek-V3 与 GPT-4o" --model deepseek --search bing
 python main.py "星露谷物语 1.6 新增内容" --json
 
 # 评测
-python evaluate.py                     # 全量评测集
+python evaluate.py                     # 全量评测集（自动断点续跑，中断不丢）
 python evaluate.py --limit 5           # 前 5 条快速验证
+python evaluate.py --fresh             # 清空进度重跑全部
 
 # FastAPI 服务
 uvicorn api:app --port 8000

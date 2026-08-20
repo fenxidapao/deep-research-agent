@@ -53,7 +53,20 @@ def planner_node(cfg: Config):
             user_msg = f"用户任务：\n{state['task']}\n\n请给出调研简报与步骤拆解。"
 
         raw = model([{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}]).content
-        data = _extract_json(raw)
+
+        # 模型输出异常（空/非 JSON）时兜底为单步计划，避免整条流程崩溃
+        try:
+            data = _extract_json(raw)
+        except Exception as e:  # noqa: BLE001
+            fallback_desc = "围绕调研主题进行全面的网络搜索与资料整理"
+            return {
+                "research_brief": state.get("research_brief", state["task"]),
+                "plan": [{"id": 1, "description": fallback_desc, "queries": [state["task"]]}],
+                "current_step": 0,
+                "iteration": 0,
+                "status": "running",
+                "reflection": f"Planner 输出解析失败已兜底: {e}",
+            }
 
         steps: list[PlanStep] = []
         for i, s in enumerate(data.get("steps", []), 1):

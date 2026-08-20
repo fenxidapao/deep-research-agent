@@ -62,7 +62,9 @@ def executor_node(cfg: Config):
         agent = CodeAgent(
             tools=build_search_tools(cfg.search_provider, cfg.tavily_api_key),
             model=model,
-            max_steps=cfg.max_searches_per_step + 3,
+            max_steps=cfg.max_searches_per_step + 5,
+            # Bing 单次搜索约 11s，默认 30s 代码执行超时远不够，放宽到 180s
+            executor_kwargs={"timeout_seconds": 180},
             verbosity_level=0,
         )
 

@@ -11,6 +11,7 @@ __pycache__/
 # 运行时产物
 .checkpoints/
 eval_set/metrics.json
+eval_set/progress.jsonl
 *.log
 
 # IDE
