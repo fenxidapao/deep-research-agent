@@ -35,6 +35,9 @@ class Config:
     # ---- 断点续跑 ----
     checkpoint_dir: str = field(default_factory=lambda: _env("CHECKPOINT_DIR", "./.checkpoints"))
 
+    # ---- 经验沉淀 ----
+    memory_file: str = field(default_factory=lambda: _env("MEMORY_FILE", "memory/experiences.json"))
+
 
 def get_config() -> Config:
     cfg = Config()

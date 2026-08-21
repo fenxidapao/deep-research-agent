@@ -6,6 +6,7 @@ from typing import Any
 
 from ..config import Config
 from ..logging_utils import get_logger
+from ..memory import ExperienceMemory
 from ..prompts import PLANNER_SYSTEM_PROMPT, TODAY
 from ..state import PlanStep, ResearchState
 
@@ -35,9 +36,10 @@ def _as_model(cfg: Config, counter=None):
 def planner_node(cfg: Config, counter=None):
     """返回 Planner 节点函数（闭包注入配置）。
 
-    首次规划：基于用户任务拆解。
+    首次规划：基于用户任务拆解，并注入历史经验（避免重蹈覆辙）。
     重规划（Reflector 判定 replan 后）：基于已有研究进展调整计划，避免重复劳动。
     """
+    memory = ExperienceMemory(cfg.memory_file)
 
     def node(state: ResearchState) -> dict[str, Any]:
         model = _as_model(cfg, counter)
@@ -56,6 +58,13 @@ def planner_node(cfg: Config, counter=None):
         else:
             logger.info("首次规划: %s", state["task"][:80])
             user_msg = f"用户任务：\n{state['task']}\n\n请给出调研简报与步骤拆解。"
+            # 注入历史经验，避免同类任务重蹈覆辙（无相关经验时不影响提示词）
+            experiences = memory.relevant(state["task"])
+            if experiences:
+                lines = "\n".join(
+                    f"- {e.get('lesson', '')} → 建议：{e.get('suggestion', '')}" for e in experiences
+                )
+                user_msg += f"\n\n【历史经验（来自同类任务，规划时注意规避）】\n{lines}"
 
         raw = model([{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}]).content
 

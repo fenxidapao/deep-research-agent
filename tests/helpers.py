@@ -25,11 +25,14 @@ class FakeModel:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = 0
+        self.messages = []  # 记录每次调用的消息列表，供断言提示词内容
 
     def __call__(self, messages, **kwargs):
         self.calls += 1
+        self.messages.append(messages)
         return FakeResponse(self.responses.pop(0))
 
     def generate(self, messages, **kwargs):
         self.calls += 1
+        self.messages.append(messages)
         return FakeResponse(self.responses.pop(0))

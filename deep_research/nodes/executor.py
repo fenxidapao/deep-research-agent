@@ -10,6 +10,7 @@ from smolagents import CodeAgent
 
 from ..config import Config
 from ..logging_utils import get_logger
+from ..memory import ExperienceMemory
 from ..state import ResearchState
 from ..tools import build_search_tools
 
@@ -40,7 +41,11 @@ EXECUTOR_TASK_TEMPLATE = """你是研究执行员，正在为一份深度研究�
 
 
 def executor_node(cfg: Config, counter=None):
-    """返回 Executor 节点函数（闭包注入配置）。"""
+    """返回 Executor 节点函数（闭包注入配置）。
+
+    memory：执行失败时沉淀经验，供后续同类任务规划时规避。
+    """
+    memory = ExperienceMemory(cfg.memory_file)
 
     def node(state: ResearchState) -> dict[str, Any]:
         from ..model import build_model
@@ -79,6 +84,11 @@ def executor_node(cfg: Config, counter=None):
         except Exception as e:  # noqa: BLE001
             logger.error("步骤 %d 执行失败: %s: %s", step["id"], type(e).__name__, e)
             note = f"（步骤 {step['id']} 执行失败：{type(e).__name__}: {e}。可由 Reflector 决定重规划或跳过）"
+            memory.add(
+                domain=str(state.get("task", ""))[:50],
+                lesson=f"步骤{step['id']}执行失败: {type(e).__name__}: {str(e)[:120]}",
+                suggestion="换更具体的关键词、拆分任务或降级搜索源后重试",
+            )
 
         return {
             "current_step": idx + 1,

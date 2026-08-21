@@ -73,3 +73,38 @@ class TestPlannerFallback:
         assert len(out["plan"]) == 2
         assert out["plan"][1]["queries"] == ["关键词B", "关键词C"]
         assert out["current_step"] == 0
+
+    def test_planner_injects_experiences(self, monkeypatch, tmp_path):
+        """经验闭环的读取端：历史经验应注入首次规划的用户提示词。"""
+        from deep_research.memory import ExperienceMemory
+
+        exp = ExperienceMemory(str(tmp_path / "exp.json"))
+        exp.add("测试任务", "关键词太宽导致结果泛化", "拆成具体子词")
+
+        payload = json.dumps(
+            {"research_brief": "简报", "steps": [{"id": 1, "description": "第一步", "queries": ["q"]}]},
+            ensure_ascii=False,
+        )
+        fake = FakeModel([payload])
+        monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+        node = planner_node(Config(memory_file=str(exp.path)))
+        node({"task": "测试任务"})
+
+        user_msg = fake.messages[0][1]["content"]  # [0]=system, [1]=user
+        assert "历史经验" in user_msg
+        assert "关键词太宽" in user_msg
+        assert "拆成具体子词" in user_msg
+
+    def test_planner_no_experience_no_injection(self, monkeypatch, tmp_path):
+        """无相关经验时提示词不含历史经验块。"""
+        payload = json.dumps(
+            {"research_brief": "简报", "steps": [{"id": 1, "description": "第一步", "queries": ["q"]}]},
+            ensure_ascii=False,
+        )
+        fake = FakeModel([payload])
+        monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+        node = planner_node(Config(memory_file=str(tmp_path / "empty.json")))
+        node({"task": "测试任务"})
+
+        user_msg = fake.messages[0][1]["content"]
+        assert "历史经验" not in user_msg

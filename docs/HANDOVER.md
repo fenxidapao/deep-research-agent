@@ -19,8 +19,9 @@ LangGraph 编排 + smolagents 内核的「规划-执行-反思」三节点深度
 | 量化评测 | ✅ 完成 | 16 条：规划成功率 100%、报告完成率 100%、命中率 98%、平均 7.1min/条 |
 | 断点恢复 | ✅ 完成 | 恢复仅 18.4s（占全流程 7%） |
 | 反思对照实验 | ✅ 完成 | 3 条小样本：反思省 ~30% token/耗时，命中率 -0.11（早停漏词） |
-| pytest 测试 | ✅ 完成（8/21） | 39 用例全 mock，1s 跑完，不依赖 API/网络 |
+| pytest 测试 | ✅ 完成（8/21） | 53 用例全 mock，1s 跑完，不依赖 API/网络 |
 | logging 化 | ✅ 完成（8/21） | 节点进出/模型调用/异常结构化日志（`logging_utils.py`） |
+| 经验沉淀 | ✅ 完成（8/21） | 失败→落盘→Planner 注入（`memory.py`，53 用例含闭环） |
 | 文档 | ✅ | README（含生产化设计章节）+ 技术博客 + 交接文档 |
 | GitHub | ✅ | `master` 最新 `ee3393c`，9 个 commit |
 
@@ -107,12 +108,12 @@ cd "E:\AI 应用开发\agent"
 
 ### 7.1 值得做（性价比排序）
 
-| 项 | 原因 | 工作量 |
-|---|---|---|
-| pytest 测试 | 工程化最硬证据，面试答"怎么保证质量" | 1-2h |
-| Memory 经验沉淀 | Agent 面试高频题"怎么记忆"；把反思/搜索失败经验写 JSON 下次读取 | 1-2h |
-| 浅层 Multi-Agent | supervisor-worker 是高频面试题，照 langgraph-supervisor 做任务分发即可 | 2-4h |
-| logging | 代码观感，面试官翻代码看得出 | 1h |
+| 项 | 原因 | 工作量 | 状态 |
+|---|---|---|---|
+| pytest 测试 | 工程化最硬证据，面试答"怎么保证质量" | 1-2h | ✅ 8/21 完成（53 用例） |
+| Memory 经验沉淀 | Agent 面试高频题"怎么记忆"；把反思/搜索失败经验写 JSON 下次读取 | 1-2h | ✅ 8/21 完成（`deep_research/memory.py`，失败→落盘→Planner 注入） |
+| 浅层 Multi-Agent | supervisor-worker 是高频面试题，照 langgraph-supervisor 做任务分发即可 | 2-4h | ⬜ 未做 |
+| logging | 代码观感，面试官翻代码看得出 | 1h | ✅ 8/21 完成（`logging_utils.py`） |
 
 ### 7.2 不值得做（面试官/简历视角 + 理由）
 
@@ -144,13 +145,15 @@ cd "E:\AI 应用开发\agent"
 
 ## 8. 可选路线图（按价值排序）
 
-1. **pytest 测试**（第 4.2 节，落地感最硬证据）；
+1. ~~**pytest 测试**~~ ✅ 8/21 完成（53 用例全绿）；
 2. **Reflector 阈值调优**（修复对照实验暴露的早停问题：complete 判定要求覆盖关键维度）——面试可讲的"迭代故事"；
 3. **CourseRAG 集成**（7.3，现成资产，0.5-1.5h）；
-4. Memory 经验沉淀（7.1）；
+4. ~~**Memory 经验沉淀**~~ ✅ 8/21 完成（`memory.py`，失败→落盘→Planner 注入）；
 5. 浅层 Multi-Agent supervisor（7.1）；
 6. Docker 部署；
 7. Tavily 搜索升级（质量更高，需 key）。
+
+> 另有已知遗留项（未修）：Planner 重规划将 `iteration` 重置为 0，`max_iterations` 护栏在 replan 循环下失效——与路线图 2 一并处理。
 
 ## 9. 一句话总结
 

@@ -38,6 +38,7 @@
 - ✅ 断点续跑：`thread_id` 维度 Checkpoint，长任务中断可恢复
 - ✅ 防重复搜索：`search_history` 状态跟踪，避免同一关键词反复搜
 - ✅ 预算护栏：步骤数/循环轮数/单步搜索次数硬上限，防止失控
+- ✅ 经验沉淀：执行失败教训写入本地 JSON，同类任务下次规划时自动规避
 - ✅ 中文优先：针对国内环境优化（Bing 搜索、中文提示词、DeepSeek 模型）
 
 ## 快速启动
@@ -150,6 +151,16 @@ Bing（免费直连） → Tavily（需 key，质量更高） → Ollama 本地�
 - 搜索：`SEARCH_PROVIDER=bing/tavily`
 - 模型：`MODEL_PROVIDER=deepseek/ollama`，Ollama 走本地 OpenAI 兼容接口，断网可用
 
+### 经验沉淀（Memory）
+
+```
+Executor 执行失败 → 写入 memory/experiences.json → 下次同类任务 Planner 规划时注入相关经验 → 规避重蹈覆辙
+```
+
+- 纯本地 JSON 文件，无模型/网络依赖；文件损坏/写入失败一律容错，不阻塞主流程
+- 检索：关键词 n-gram 重叠打分，取 top-3 注入提示词
+- 路径可配：`MEMORY_FILE`（默认 `memory/experiences.json`，已 gitignore）
+
 ### 测试
 
 ```bash
@@ -168,6 +179,7 @@ agent/
 │   ├── prompts.py          # Planner/Reflector/Writer 提示词
 │   ├── tools.py            # Bing/Tavily 搜索 + 网页抓取（smolagents Tool）
 │   ├── model.py            # DeepSeek / Ollama 模型工厂 + UsageCounter
+│   ├── memory.py           # 经验沉淀（JSON 落盘 + 关键词检索）
 │   └── nodes/
 │       ├── planner.py      # 拆解任务为简报 + 步骤
 │       ├── executor.py     # smolagents CodeAgent 执行单步研究
