@@ -19,6 +19,7 @@ import sys
 import time
 
 from deep_research import build_graph, get_config
+from deep_research.tools import get_tool_stats, reset_tool_stats
 
 PROGRESS_FILE = "eval_set/progress.jsonl"
 
@@ -164,6 +165,7 @@ def main():
 
     cfg = get_config()
     graph = build_graph(cfg)
+    reset_tool_stats()  # 工具调用统计清零（T-3 埋点）
     tasks = load_tasks(args.tasks)
     if args.limit:
         tasks = tasks[: args.limit]
@@ -194,6 +196,7 @@ def main():
         extra["resume_test"] = rt
     # token 统计放最后：resume_test 也会消耗 token，需在之后取值
     metrics["总token消耗"] = graph.usage_counter.total_tokens
+    metrics["工具统计"] = get_tool_stats()  # T-3：工具调用次数/失败/无结果
     if args.ablation:
         print(f"\n=== 反思前后对照实验（{args.ablation} 条）===")
         rows = ablation(tasks, cfg, limit=args.ablation)

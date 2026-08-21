@@ -8,12 +8,14 @@ import time
 
 from deep_research import build_graph, get_config
 from deep_research.logging_utils import get_logger, setup_logging
+from deep_research.tools import get_tool_stats, reset_tool_stats
 
 logger = get_logger("cli")
 
 
 def run(task: str, verbose: bool = True, supervisor: bool = False) -> dict:
     cfg = get_config()
+    reset_tool_stats()  # 工具调用统计清零（T-3 埋点）
     graph = build_graph(cfg, supervisor=supervisor)
     thread_id = f"run-{int(time.time())}"
 
@@ -24,6 +26,7 @@ def run(task: str, verbose: bool = True, supervisor: bool = False) -> dict:
     )
     elapsed = time.time() - t0
     logger.info("任务完成: thread=%s 状态=%s 耗时=%.1fs", thread_id, final.get("status"), elapsed)
+    logger.info("工具统计: %s", get_tool_stats())
 
     if verbose:
         print("=" * 60)

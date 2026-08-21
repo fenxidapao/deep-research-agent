@@ -8,6 +8,7 @@
 
 import html
 import re
+import threading
 from typing import Optional
 
 import requests
@@ -22,6 +23,39 @@ _BING_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
 }
+
+# ---------- 工具调用统计（T-3 埋点：量化"工具调用成功率"） ----------
+# 模块级线程安全计数：calls 每次调用 +1；fail=错误返回；no_result=执行成功但无结果。
+# 供评测脚本/CLI 汇总输出，不改变工具返回值与行为。
+
+TOOL_STATS = {
+    "web_search": {"calls": 0, "fail": 0, "no_result": 0},
+    "fetch_page": {"calls": 0, "fail": 0, "no_result": 0},
+}
+_STATS_LOCK = threading.Lock()
+
+
+def _record(name: str) -> None:
+    with _STATS_LOCK:
+        TOOL_STATS[name]["calls"] += 1
+
+
+def _mark(name: str, key: str) -> None:
+    with _STATS_LOCK:
+        TOOL_STATS[name][key] += 1
+
+
+def get_tool_stats() -> dict:
+    """返回统计快照（深拷贝，避免并发读脏）。"""
+    with _STATS_LOCK:
+        return {k: dict(v) for k, v in TOOL_STATS.items()}
+
+
+def reset_tool_stats() -> None:
+    """清零统计（评测开始前调用）。"""
+    with _STATS_LOCK:
+        for v in TOOL_STATS.values():
+            v["calls"] = v["fail"] = v["no_result"] = 0
 
 
 def _clean_html(raw: str, max_chars: int = 6000) -> str:
@@ -54,6 +88,7 @@ class WebSearchTool(Tool):
             raise ValueError("Tavily 需要 TAVILY_API_KEY")
 
     def forward(self, query: str) -> str:
+        _record("web_search")
         if self.provider == "tavily":
             return self._tavily(query)
         return self._bing(query)
@@ -67,15 +102,18 @@ class WebSearchTool(Tool):
             resp.raise_for_status()
         except Exception as e:  # noqa: BLE001
             logger.warning("Bing 搜索失败: %s", e)
+            _mark("web_search", "fail")
             return f"Bing 搜索失败: {e}"
 
         try:
             doc = lh.fromstring(resp.text)
             items = doc.xpath('//li[contains(@class, "b_algo")]')[: self.max_results]
         except Exception as e:  # noqa: BLE001
+            _mark("web_search", "fail")
             return f"解析搜索结果失败: {e}"
 
         if not items:
+            _mark("web_search", "no_result")
             return "没有搜到结果，请换关键词重试。"
 
         lines = []
@@ -97,6 +135,7 @@ class WebSearchTool(Tool):
         try:
             from tavily import TavilyClient
         except ImportError:
+            _mark("web_search", "fail")
             return "错误：未安装 tavily-python"
 
         try:
@@ -104,10 +143,12 @@ class WebSearchTool(Tool):
                 query=query, max_results=self.max_results, search_depth="basic"
             )
         except Exception as e:  # noqa: BLE001
+            _mark("web_search", "fail")
             return f"搜索失败: {e}"
 
         results = resp.get("results", [])
         if not results:
+            _mark("web_search", "no_result")
             return "没有搜到结果，请换关键词重试。"
 
         lines = []
@@ -135,12 +176,15 @@ class FetchPageTool(Tool):
         self.max_chars = max_chars
 
     def forward(self, url: str) -> str:
+        _record("fetch_page")
         if not url.startswith(("http://", "https://")):
+            _mark("fetch_page", "fail")
             return "错误：URL 必须以 http:// 或 https:// 开头"
         try:
             resp = requests.get(url, timeout=self.timeout, headers=_BING_HEADERS, allow_redirects=True)
             resp.raise_for_status()
         except Exception as e:  # noqa: BLE001
+            _mark("fetch_page", "fail")
             return f"抓取失败: {e}"
         return _clean_html(resp.text, self.max_chars)
 

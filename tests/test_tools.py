@@ -1,8 +1,14 @@
-"""工具层测试：Bing 解析（mock 响应，不碰网络）+ HTML 清洗 + URL 校验。"""
+"""工具层测试：Bing 解析（mock 响应，不碰网络）+ HTML 清洗 + URL 校验 + 调用统计埋点。"""
 
 import requests
 
-from deep_research.tools import FetchPageTool, WebSearchTool, _clean_html
+from deep_research.tools import (
+    FetchPageTool,
+    WebSearchTool,
+    _clean_html,
+    get_tool_stats,
+    reset_tool_stats,
+)
 
 BING_HTML = """
 <html><body><ol id="b_results">
@@ -103,3 +109,51 @@ class TestFetchPage:
         monkeypatch.setattr("deep_research.tools.requests.get", boom)
         out = FetchPageTool().forward("https://example.com/x")
         assert "抓取失败" in out
+
+
+class TestToolStats:
+    """T-3 埋点：工具调用次数/失败/无结果统计（每次先清零，互不干扰）。"""
+
+    def test_success_records_call(self, monkeypatch):
+        reset_tool_stats()
+        monkeypatch.setattr("deep_research.tools.requests.get", lambda *a, **k: _FakeResp(BING_HTML))
+        WebSearchTool(provider="bing").forward("测试")
+        s = get_tool_stats()["web_search"]
+        assert s["calls"] == 1
+        assert s["fail"] == 0
+        assert s["no_result"] == 0
+
+    def test_fail_records_fail(self, monkeypatch):
+        reset_tool_stats()
+
+        def boom(*a, **k):
+            raise requests.ConnectionError("网络错误")
+
+        monkeypatch.setattr("deep_research.tools.requests.get", boom)
+        WebSearchTool(provider="bing").forward("测试")
+        s = get_tool_stats()["web_search"]
+        assert s["calls"] == 1
+        assert s["fail"] == 1
+
+    def test_no_result_records_separately(self, monkeypatch):
+        reset_tool_stats()
+        monkeypatch.setattr("deep_research.tools.requests.get", lambda *a, **k: _FakeResp(EMPTY_HTML))
+        WebSearchTool(provider="bing").forward("x")
+        s = get_tool_stats()["web_search"]
+        assert s["calls"] == 1
+        assert s["fail"] == 0
+        assert s["no_result"] == 1  # 成功执行但无结果，不算失败
+
+    def test_fetch_page_stats(self):
+        reset_tool_stats()
+        FetchPageTool().forward("ftp://x")  # URL 非法 → fail
+        s = get_tool_stats()["fetch_page"]
+        assert s["calls"] == 1
+        assert s["fail"] == 1
+
+    def test_reset_clears_all(self, monkeypatch):
+        reset_tool_stats()
+        monkeypatch.setattr("deep_research.tools.requests.get", lambda *a, **k: _FakeResp(BING_HTML))
+        WebSearchTool(provider="bing").forward("a")
+        reset_tool_stats()
+        assert all(v["calls"] == 0 for v in get_tool_stats().values())
