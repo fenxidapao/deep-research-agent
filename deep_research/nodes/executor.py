@@ -36,7 +36,7 @@ EXECUTOR_TASK_TEMPLATE = """你是研究执行员，正在为一份深度研究�
 字数控制在 300~600 字，使用中文。"""
 
 
-def executor_node(cfg: Config):
+def executor_node(cfg: Config, counter=None):
     """返回 Executor 节点函数（闭包注入配置）。"""
 
     def node(state: ResearchState) -> dict[str, Any]:
@@ -58,7 +58,7 @@ def executor_node(cfg: Config):
         # 过滤掉已搜索过的关键词，避免重复搜索
         fresh_queries = [q for q in queries if q not in state.get("search_history", [])]
 
-        model = build_model(cfg)
+        model = build_model(cfg, counter)
         agent = CodeAgent(
             tools=build_search_tools(cfg.search_provider, cfg.tavily_api_key),
             model=model,

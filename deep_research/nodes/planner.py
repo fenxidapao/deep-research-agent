@@ -22,14 +22,14 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(text[start : end + 1])
 
 
-def _as_model(cfg: Config):
+def _as_model(cfg: Config, counter=None):
     """延迟导入避免循环依赖。"""
     from ..model import build_model
 
-    return build_model(cfg)
+    return build_model(cfg, counter)
 
 
-def planner_node(cfg: Config):
+def planner_node(cfg: Config, counter=None):
     """返回 Planner 节点函数（闭包注入配置）。
 
     首次规划：基于用户任务拆解。
@@ -37,7 +37,7 @@ def planner_node(cfg: Config):
     """
 
     def node(state: ResearchState) -> dict[str, Any]:
-        model = _as_model(cfg)
+        model = _as_model(cfg, counter)
         prompt = PLANNER_SYSTEM_PROMPT.format(today=TODAY, max_steps=cfg.max_plan_steps)
 
         # 重规划场景：带上已有进展，要求新计划基于现状调整

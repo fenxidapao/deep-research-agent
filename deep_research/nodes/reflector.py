@@ -11,7 +11,7 @@ from .planner import _extract_json
 DECISION_MAP = {"continue": "running", "replan": "replan", "complete": "complete"}
 
 
-def reflector_node(cfg: Config):
+def reflector_node(cfg: Config, counter=None):
     """返回 Reflector 节点函数（闭包注入配置）。"""
 
     def node(state: ResearchState) -> dict[str, Any]:
@@ -42,7 +42,7 @@ def reflector_node(cfg: Config):
             }
 
         # ---- 调用模型做语义判定 ----
-        model = build_model(cfg)
+        model = build_model(cfg, counter)
         remaining = plan[state.get("current_step", 0) :]
         remaining_desc = "\n".join(f"- 步骤{s['id']}: {s['description']}" for s in remaining)
 

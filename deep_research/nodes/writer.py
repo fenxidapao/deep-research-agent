@@ -7,13 +7,13 @@ from ..prompts import TODAY, WRITER_SYSTEM_PROMPT
 from ..state import ResearchState
 
 
-def writer_node(cfg: Config):
+def writer_node(cfg: Config, counter=None):
     """返回 Writer 节点函数（闭包注入配置）。"""
 
     def node(state: ResearchState) -> dict[str, Any]:
         from ..model import build_model
 
-        model = build_model(cfg)
+        model = build_model(cfg, counter)
         notes = "\n\n".join(state.get("intermediate_results", []))
         if not notes.strip():
             notes = "（未收集到研究笔记）"
