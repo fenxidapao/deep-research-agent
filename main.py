@@ -1,11 +1,15 @@
-"""CLI 入口：python main.py "调研问题" [--model deepseek|ollama] [--search duckduckgo|tavily]"""
+"""CLI 入口：python main.py "调研问题" [--model deepseek|ollama] [--search bing|tavily] [--json]"""
 
 import argparse
 import json
+import os
 import sys
 import time
 
 from deep_research import build_graph, get_config
+from deep_research.logging_utils import get_logger, setup_logging
+
+logger = get_logger("cli")
 
 
 def run(task: str, verbose: bool = True) -> dict:
@@ -19,6 +23,7 @@ def run(task: str, verbose: bool = True) -> dict:
         config={"configurable": {"thread_id": thread_id}},
     )
     elapsed = time.time() - t0
+    logger.info("任务完成: thread=%s 状态=%s 耗时=%.1fs", thread_id, final.get("status"), elapsed)
 
     if verbose:
         print("=" * 60)
@@ -36,14 +41,13 @@ def run(task: str, verbose: bool = True) -> dict:
 
 
 def main():
+    setup_logging()  # 日志走 stderr，--json 模式 stdout 只含 JSON
     parser = argparse.ArgumentParser(description="Deep Research Agent（LangGraph + smolagents）")
     parser.add_argument("task", help="调研问题")
     parser.add_argument("--model", choices=["deepseek", "ollama"], default=None, help="模型 provider（默认读 .env）")
     parser.add_argument("--search", choices=["bing", "tavily"], default=None, help="搜索 provider（默认读 .env）")
     parser.add_argument("--json", action="store_true", help="输出 JSON（供脚本/评测使用）")
     args = parser.parse_args()
-
-    import os
 
     if args.model:
         os.environ["MODEL_PROVIDER"] = args.model
@@ -53,7 +57,7 @@ def main():
     try:
         result = run(args.task)
     except ValueError as e:
-        print(f"配置错误: {e}", file=sys.stderr)
+        logger.error("配置错误: %s", e)
         sys.exit(1)
 
     if args.json:

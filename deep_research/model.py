@@ -11,6 +11,9 @@ from typing import Any, Optional
 from smolagents import OpenAIModel
 
 from .config import Config
+from .logging_utils import get_logger
+
+logger = get_logger("model")
 
 
 class UsageCounter:
@@ -80,5 +83,6 @@ def build_model(cfg: Config, counter: Optional[UsageCounter] = None):
             max_tokens=2048,
         )
     if counter is not None:
+        logger.info("模型已启用 token 计数: provider=%s model=%s", cfg.provider, model.model_id)
         return _CountingModel(model, counter)
     return model

@@ -3,8 +3,11 @@
 from typing import Any
 
 from ..config import Config
+from ..logging_utils import get_logger
 from ..prompts import TODAY, WRITER_SYSTEM_PROMPT
 from ..state import ResearchState
+
+logger = get_logger("writer")
 
 
 def writer_node(cfg: Config, counter=None):
@@ -32,8 +35,10 @@ def writer_node(cfg: Config, counter=None):
             report = str(raw or "").strip()
             if len(report) >= 50:
                 break
+            logger.warning("Writer 第 %d 次输出过短(%d 字)，重试", attempt + 1, len(report))
         if len(report) < 50:
             # 兜底：直接输出研究笔记原文，保证报告不为空
+            logger.error("Writer 三次重试仍失败，使用研究笔记原文兜底")
             report = f"（自动报告生成失败，以下为研究笔记原文）\n\n{notes[: cfg.max_report_length]}"
         return {"final_report": report, "status": "complete"}
 

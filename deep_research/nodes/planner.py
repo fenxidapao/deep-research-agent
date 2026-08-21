@@ -5,8 +5,11 @@ import re
 from typing import Any
 
 from ..config import Config
+from ..logging_utils import get_logger
 from ..prompts import PLANNER_SYSTEM_PROMPT, TODAY
 from ..state import PlanStep, ResearchState
+
+logger = get_logger("planner")
 
 
 def _extract_json(text: str) -> dict[str, Any]:
@@ -43,6 +46,7 @@ def planner_node(cfg: Config, counter=None):
         # 重规划场景：带上已有进展，要求新计划基于现状调整
         existing = state.get("intermediate_results", [])
         if existing:
+            logger.info("重规划: 已有 %d 条研究笔记", len(existing))
             user_msg = (
                 f"用户任务：\n{state['task']}\n\n"
                 f"原调研简报：{state.get('research_brief', state['task'])}\n\n"
@@ -50,6 +54,7 @@ def planner_node(cfg: Config, counter=None):
                 f"请基于已有进展**重新规划**剩余步骤：只列出仍需调研的维度，跳过已完成内容。"
             )
         else:
+            logger.info("首次规划: %s", state["task"][:80])
             user_msg = f"用户任务：\n{state['task']}\n\n请给出调研简报与步骤拆解。"
 
         raw = model([{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}]).content
@@ -58,6 +63,7 @@ def planner_node(cfg: Config, counter=None):
         try:
             data = _extract_json(raw)
         except Exception as e:  # noqa: BLE001
+            logger.warning("Planner 输出解析失败，兜底为单步计划: %s", e)
             fallback_desc = "围绕调研主题进行全面的网络搜索与资料整理"
             return {
                 "research_brief": state.get("research_brief", state["task"]),

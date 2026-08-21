@@ -103,6 +103,61 @@ curl -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{
 
 **结论（如实）**：反思的价值在**效率**而非准确率——Reflector 的早停/精简平均省约 30% token 与耗时；但 #1 因过早 complete（第一轮即判定收尾）漏掉关键词，命中率 -0.11。改进方向：提高 Reflector 的 complete 阈值（如要求覆盖全部计划步骤或关键维度再收尾）。样本量小，结论为初步观察。
 
+## 生产化设计
+
+> 面向"可部署、可维护、可演进"的工程化设计，而非一次性脚本。对应代码：`deep_research/` 包 + `tests/`（39 个用例，全部 mock，秒级跑完，不依赖真实 API/网络）。
+
+### 预算护栏（防失控）
+
+| 护栏 | 实现 | 配置项 |
+|---|---|---|
+| 计划步数上限 | Planner 单次最多产出 `max_plan_steps` 步 | `MAX_PLAN_STEPS` |
+| 循环轮数上限 | Reflector 达 `max_iterations` 强制收尾 | `MAX_ITERATIONS` |
+| 单步搜索上限 | CodeAgent `max_steps` 限制单步工具调用 | `MAX_SEARCHES_PER_STEP` |
+| 报告长度上限 | Writer 输出截断 | `MAX_REPORT_LENGTH` |
+| 单步执行超时 | CodeAgent 代码执行 180s 超时 | `executor_kwargs` |
+
+> ⚠️ 已知遗留项：Planner 重规划时将 `iteration` 重置为 0，导致 `max_iterations` 护栏在 replan 循环下失效（步骤/搜索仍受 current_step 与 max_steps 兜底，不会无限运行，但轮数不累计）。待修。
+
+### 断点续跑（长任务不重跑）
+
+- LangGraph `MemorySaver` + `thread_id`：中断后同一 thread_id 续跑，已完成的研究步骤不重跑
+- 实测：中断恢复仅 18.4s，占全流程 7%（评测 #15）
+- 评测脚本 `evaluate.py` 实时落盘 `progress.jsonl`，中断后自动跳过已完成任务
+
+### 容错策略
+
+| 故障 | 处理 |
+|---|---|
+| 模型偶发空输出 | Writer 三重试，最终兜底输出研究笔记原文（HANDOVER 踩坑 #5） |
+| Planner 输出非 JSON | `_extract_json` 容错解析（容忍代码块/前后杂质）；失败兜底为单步计划 |
+| Reflector 输出异常 | 默认 continue，不中断流程 |
+| 单步执行异常 | 记录失败原因，交由 Reflector 决定重规划或跳过 |
+| 搜索失败/解析失败 | 返回可读错误文案，CodeAgent 自行换词重试 |
+
+### 成本控制
+
+- 默认 DeepSeek-v4-flash（便宜）+ Bing 免费直连：全项目 16 条评测约 5~6 元
+- `UsageCounter` 精确统计每次调用的 input/output token（双入口：`__call__` + `generate()`），评测输出单任务 21~32 万 token
+- 反思模式平均省约 30% token/耗时（见上方 ablation 表）
+
+### 搜索降级链
+
+```
+Bing（免费直连） → Tavily（需 key，质量更高） → Ollama 本地（离线）
+```
+
+- 搜索：`SEARCH_PROVIDER=bing/tavily`
+- 模型：`MODEL_PROVIDER=deepseek/ollama`，Ollama 走本地 OpenAI 兼容接口，断网可用
+
+### 测试
+
+```bash
+.venv/Scripts/python -m pytest tests/ -q    # 39 passed，全 mock，约 1s
+```
+
+覆盖：`_extract_json` 容错、`UsageCounter` 计数、Bing 解析（mock HTML）、`_route` 三路由、Writer 空输出重试、mock 全链路端到端（含 replan 循环）。
+
 ## 项目结构
 
 ```
@@ -112,12 +167,20 @@ agent/
 │   ├── state.py            # State 定义（步骤/结果/反思/报告）
 │   ├── prompts.py          # Planner/Reflector/Writer 提示词
 │   ├── tools.py            # Bing/Tavily 搜索 + 网页抓取（smolagents Tool）
-│   ├── model.py            # DeepSeek / Ollama 模型工厂
+│   ├── model.py            # DeepSeek / Ollama 模型工厂 + UsageCounter
 │   └── nodes/
 │       ├── planner.py      # 拆解任务为简报 + 步骤
 │       ├── executor.py     # smolagents CodeAgent 执行单步研究
 │       ├── reflector.py    # 判定 continue/replan/complete
 │       └── writer.py       # 汇总笔记生成 Markdown 报告
+├── tests/                  # 39 个 pytest 用例（全 mock，不调真实 API）
+│   ├── helpers.py          # FakeModel 测试替身
+│   ├── test_planner.py     # _extract_json 容错 + 兜底
+│   ├── test_model.py       # UsageCounter / _CountingModel 双入口
+│   ├── test_tools.py       # Bing 解析（mock HTML）+ 网页抓取
+│   ├── test_graph.py       # _route 三路由
+│   ├── test_writer.py      # Writer 空输出重试 + 兜底
+│   └── test_e2e.py         # mock 全链路端到端（含 replan 循环）
 ├── main.py                 # CLI
 ├── api.py                  # FastAPI 接口
 ├── evaluate.py             # 量化评测脚本

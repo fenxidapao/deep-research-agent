@@ -9,8 +9,11 @@ from typing import Any
 from smolagents import CodeAgent
 
 from ..config import Config
+from ..logging_utils import get_logger
 from ..state import ResearchState
 from ..tools import build_search_tools
+
+logger = get_logger("executor")
 
 EXECUTOR_TASK_TEMPLATE = """你是研究执行员，正在为一份深度研究报告收集资料。
 
@@ -49,6 +52,7 @@ def executor_node(cfg: Config, counter=None):
 
         step = plan[idx]
         queries = step.get("queries", [])
+        logger.info("执行步骤 %d/%d: %s", idx + 1, len(plan), step["description"][:60])
         prompt = EXECUTOR_TASK_TEMPLATE.format(
             research_brief=state.get("research_brief", state["task"]),
             step_description=step["description"],
@@ -73,6 +77,7 @@ def executor_node(cfg: Config, counter=None):
             if not isinstance(note, str) or not note.strip():
                 note = f"（步骤 {step['id']} 未产出有效笔记）"
         except Exception as e:  # noqa: BLE001
+            logger.error("步骤 %d 执行失败: %s: %s", step["id"], type(e).__name__, e)
             note = f"（步骤 {step['id']} 执行失败：{type(e).__name__}: {e}。可由 Reflector 决定重规划或跳过）"
 
         return {

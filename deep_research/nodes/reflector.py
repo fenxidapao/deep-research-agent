@@ -4,9 +4,12 @@ import json
 from typing import Any
 
 from ..config import Config
+from ..logging_utils import get_logger
 from ..prompts import REFLECTOR_SYSTEM_PROMPT, TODAY
 from ..state import ResearchState
 from .planner import _extract_json
+
+logger = get_logger("reflector")
 
 DECISION_MAP = {"continue": "running", "replan": "replan", "complete": "complete"}
 
@@ -21,6 +24,7 @@ def reflector_node(cfg: Config, counter=None):
         plan = state.get("plan", [])
         done = state.get("completed_steps", [])
         results = state.get("intermediate_results", [])
+        logger.info("反思评估: iteration=%d 已完成 %d/%d 步", iteration, len(done), len(plan))
 
         # ---- 硬性退出条件：预算用尽或步骤全部执行完 ----
         forced_complete = False
@@ -62,8 +66,11 @@ def reflector_node(cfg: Config, counter=None):
             if decision not in DECISION_MAP:
                 decision = "continue"
         except Exception as e:  # noqa: BLE001
+            logger.warning("Reflector 输出解析失败，默认 continue: %s", e)
             decision = "continue"
             data = {"reason": f"反思解析失败，默认继续: {e}", "gap": ""}
+
+        logger.info("反思决策=%s 理由=%s", decision, data.get("reason", "")[:100])
 
         return {
             "reflection": f"决策={decision} | 理由: {data.get('reason', '')} | 缺口: {data.get('gap', '')}",
