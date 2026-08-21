@@ -110,3 +110,28 @@ def test_end_to_end_supervisor_mode(monkeypatch):
     assert final["final_report"].startswith("这是一份端到端测试")
     assert len(final["completed_steps"]) == 2  # 两个步骤一批并行完成
     assert fake.calls == 2  # planner + writer（worker 走 mock 的 run_single_step）
+
+
+def test_checkpoint_resume_skips_completed_work(monkeypatch):
+    """断点续跑：writer 前中断，同一 thread_id 恢复后不重跑 planner/executor。
+
+    验证方式：模型调用次数——中断后恢复只多 writer 一次（已完成步骤未重跑）。
+    若 Checkpoint 失效会从头执行（planner 再调一次），calls 会变成 3。
+    """
+    fake = FakeModel([PLAN_JSON, REPORT])  # 仅允许 planner + writer 各调一次
+    monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+    monkeypatch.setattr("deep_research.graph.executor_node", _fake_executor_factory)
+
+    graph = build_graph(Config(), reflect=False)
+    config = {"configurable": {"thread_id": "ckpt-resume-test"}}
+
+    # 第一次：中断在 writer 前（planner + executor 已完成，writer 未跑）
+    state = graph.invoke({"task": "测试任务"}, config=config, interrupt_before=["writer"])
+    assert fake.calls == 1  # 只调了 planner
+    assert len(state.get("completed_steps", [])) == 2  # executor 已完成两步
+
+    # 恢复：从断点继续，只跑 writer
+    final = graph.invoke(None, config=config)
+    assert fake.calls == 2  # 只多 writer 一次 → 已完成步骤未重跑
+    assert final["status"] == "complete"
+    assert final["final_report"].startswith("这是一份端到端测试")

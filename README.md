@@ -110,7 +110,7 @@ curl -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{
 
 ## 生产化设计
 
-> 面向"可部署、可维护、可演进"的工程化设计，而非一次性脚本。对应代码：`deep_research/` 包 + `tests/`（39 个用例，全部 mock，秒级跑完，不依赖真实 API/网络）。
+> 面向"可部署、可维护、可演进"的工程化设计，而非一次性脚本。对应代码：`deep_research/` 包 + `tests/`（72 个用例，全部 mock，秒级跑完，不依赖真实 API/网络）。
 
 ### 预算护栏（防失控）
 
@@ -122,7 +122,7 @@ curl -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{
 | 报告长度上限 | Writer 输出截断 | `MAX_REPORT_LENGTH` |
 | 单步执行超时 | CodeAgent 代码执行 180s 超时 | `executor_kwargs` |
 
-> ⚠️ 已知遗留项：Planner 重规划时将 `iteration` 重置为 0，导致 `max_iterations` 护栏在 replan 循环下失效（步骤/搜索仍受 current_step 与 max_steps 兜底，不会无限运行，但轮数不累计）。待修。
+> ✅ 修复记录（8/21）：Planner 重规划曾将 `iteration` 重置为 0，导致 `max_iterations` 护栏在 replan 循环下失效——现重规划保留累计值（含解析失败兜底分支），护栏恢复生效。回归测试：`tests/test_planner.py` / `test_reflector.py`。
 
 ### 断点续跑（长任务不重跑）
 
@@ -179,10 +179,10 @@ Planner 拆解步骤 → Supervisor 取一批（≤ max_parallel_workers）→ �
 ### 测试
 
 ```bash
-.venv/Scripts/python -m pytest tests/ -q    # 39 passed，全 mock，约 1s
+.venv/Scripts/python -m pytest tests/ -q    # 72 passed，全 mock，约 1s
 ```
 
-覆盖：`_extract_json` 容错、`UsageCounter` 计数、Bing 解析（mock HTML）、`_route` 三路由、Writer 空输出重试、mock 全链路端到端（含 replan 循环）。
+覆盖：`_extract_json` 容错、`UsageCounter` 计数、Bing 解析（mock HTML）、`_route` 三路由、Writer 空输出重试、planner iteration 保留、Reflector 预算护栏、mock 全链路端到端（含 replan 循环、supervisor 并行、断点续跑）。
 
 ## 项目结构
 

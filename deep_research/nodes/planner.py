@@ -78,7 +78,8 @@ def planner_node(cfg: Config, counter=None):
                 "research_brief": state.get("research_brief", state["task"]),
                 "plan": [{"id": 1, "description": fallback_desc, "queries": [state["task"]]}],
                 "current_step": 0,
-                "iteration": 0,
+                # 保留 iteration：重规划时若重置为 0，max_iterations 护栏会失效（曾为缺陷）
+                "iteration": state.get("iteration", 0),
                 "status": "running",
                 "reflection": f"Planner 输出解析失败已兜底: {e}",
             }
@@ -97,7 +98,8 @@ def planner_node(cfg: Config, counter=None):
             "research_brief": str(data.get("research_brief", state["task"])),
             "plan": steps,
             "current_step": 0,
-            "iteration": 0,
+            # 首次规划 state 无 iteration → 0；重规划保留 Reflector 累计值，护栏才生效
+            "iteration": state.get("iteration", 0),
             "status": "running",
         }
 

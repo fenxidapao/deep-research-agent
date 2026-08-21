@@ -108,3 +108,49 @@ class TestPlannerFallback:
 
         user_msg = fake.messages[0][1]["content"]
         assert "历史经验" not in user_msg
+
+    def test_replan_preserves_iteration(self, monkeypatch, tmp_path):
+        """重规划（已有进展）必须保留 iteration，否则 max_iterations 护栏失效（缺陷修复）。"""
+        payload = json.dumps(
+            {"research_brief": "简报", "steps": [{"id": 2, "description": "补充核查", "queries": ["q"]}]},
+            ensure_ascii=False,
+        )
+        fake = FakeModel([payload])
+        monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+        node = planner_node(Config(memory_file=str(tmp_path / "m.json")))
+
+        out = node(
+            {
+                "task": "测试任务",
+                "research_brief": "简报",
+                "intermediate_results": ["【步骤1】已有笔记"],  # 触发重规划分支
+                "iteration": 3,  # Reflector 已累计 3 轮
+            }
+        )
+        assert out["iteration"] == 3  # 不再被重置为 0
+
+    def test_first_plan_starts_iteration_zero(self, monkeypatch, tmp_path):
+        """首次规划（无进展）iteration 从 0 开始。"""
+        payload = json.dumps(
+            {"research_brief": "简报", "steps": [{"id": 1, "description": "第一步", "queries": ["q"]}]},
+            ensure_ascii=False,
+        )
+        fake = FakeModel([payload])
+        monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+        node = planner_node(Config(memory_file=str(tmp_path / "m.json")))
+        out = node({"task": "测试任务"})
+        assert out["iteration"] == 0
+
+    def test_replan_fallback_preserves_iteration(self, monkeypatch, tmp_path):
+        """重规划时解析失败走兜底，同样不得重置 iteration。"""
+        fake = FakeModel(["不是JSON"])
+        monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+        node = planner_node(Config(memory_file=str(tmp_path / "m.json")))
+        out = node(
+            {
+                "task": "测试任务",
+                "intermediate_results": ["已有笔记"],
+                "iteration": 5,
+            }
+        )
+        assert out["iteration"] == 5

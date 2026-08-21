@@ -19,12 +19,13 @@ LangGraph 编排 + smolagents 内核的「规划-执行-反思」三节点深度
 | 量化评测 | ✅ 完成 | 16 条：规划成功率 100%、报告完成率 100%、命中率 98%、平均 7.1min/条 |
 | 断点恢复 | ✅ 完成 | 恢复仅 18.4s（占全流程 7%） |
 | 反思对照实验 | ✅ 完成 | 3 条小样本：反思省 ~30% token/耗时，命中率 -0.11（早停漏词） |
-| pytest 测试 | ✅ 完成（8/21） | 53 用例全 mock，1s 跑完，不依赖 API/网络 |
+| pytest 测试 | ✅ 完成（8/21） | 72 用例全 mock，1s 跑完，不依赖 API/网络 |
 | logging 化 | ✅ 完成（8/21） | 节点进出/模型调用/异常结构化日志（`logging_utils.py`） |
-| 经验沉淀 | ✅ 完成（8/21） | 失败→落盘→Planner 注入（`memory.py`，53 用例含闭环） |
+| 经验沉淀 | ✅ 完成（8/21） | 失败→落盘→Planner 注入（`memory.py`，含闭环） |
 | supervisor 多 Agent | ✅ 完成（8/21） | 一批步骤并行分发 worker（`supervisor.py`，CLI `--supervisor`） |
+| iteration 缺陷修复 | ✅ 完成（8/21） | 重规划保留 iteration，max_iterations 护栏恢复生效 |
 | 文档 | ✅ | README（含生产化设计章节）+ 技术博客 + 交接文档 |
-| GitHub | ✅ | `master` 最新 `ee3393c`，9 个 commit |
+| GitHub | ✅ | `master` 最新 `c81d656`，14 个 commit |
 
 ## 3. 运行指南（三分钟跑起来）
 
@@ -146,16 +147,16 @@ cd "E:\AI 应用开发\agent"
 
 ## 8. 可选路线图（按价值排序）
 
-1. ~~**pytest 测试**~~ ✅ 8/21 完成（53 用例全绿）；
-2. **Reflector 阈值调优**（修复对照实验暴露的早停问题：complete 判定要求覆盖关键维度）——面试可讲的"迭代故事"；
+1. ~~**pytest 测试**~~ ✅ 8/21 完成（72 用例全绿）；
+2. ~~**iteration 缺陷修复**~~ ✅ 8/21 完成（重规划保留轮数，护栏恢复）；**Reflector 早停调优仍可选**（ablation 暴露的 #1 命中 0.67，complete 判定要求覆盖关键维度）；
 3. **CourseRAG 集成**（7.3，现成资产，0.5-1.5h）；
 4. ~~**Memory 经验沉淀**~~ ✅ 8/21 完成（`memory.py`，失败→落盘→Planner 注入）；
 5. ~~**浅层 Multi-Agent supervisor**~~ ✅ 8/21 完成（`supervisor.py`，CLI `--supervisor`）；
 6. Docker 部署；
 7. Tavily 搜索升级（质量更高，需 key）。
 
-> 另有已知遗留项（未修）：Planner 重规划将 `iteration` 重置为 0，`max_iterations` 护栏在 replan 循环下失效——与路线图 2 一并处理。
+> 全量评测数据为修复前版本（iteration 修复后如需新指标，`evaluate.py --fresh` 重跑约 1.9h/5 元）。
 
 ## 9. 一句话总结
 
-项目**已按"完整落地"标准定稿**（8/21）：39 个 pytest 全绿 + README 生产化设计 + logging 化，commit `ee3393c` 已推送。剩余均为可选：Docker 部署、Reflector 阈值调优（修早停）、CourseRAG 集成。**已知遗留项**：Planner 重规划将 `iteration` 重置为 0，`max_iterations` 护栏在 replan 循环下失效（步骤/搜索仍受兜底，不会失控），详见 README「生产化设计」。
+项目**已按"完整落地"标准定稿**（8/21）：72 个 pytest 全绿 + README 生产化设计 + logging + 经验沉淀 + supervisor 并行 + iteration 护栏修复，commit `c81d656`（待推 iteration 修复 commit）。剩余均为可选：Docker 部署、Reflector 早停调优、CourseRAG 集成。全量评测数据为修复前版本，如需新指标 `evaluate.py --fresh` 重跑。
