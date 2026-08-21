@@ -21,3 +21,4 @@ memory/
 # IDE
 .idea/
 .vscode/
+eval_set/progress.backup*.jsonl
