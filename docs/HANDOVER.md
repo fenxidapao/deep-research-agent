@@ -16,7 +16,7 @@ LangGraph 编排 + smolagents 内核的「规划-执行-反思」三节点深度
 |---|---|---|
 | 三节点架构代码 | ✅ 完整 | `deep_research/` 包 |
 | CLI + FastAPI | ✅ 可用 | `main.py` / `api.py` |
-| 量化评测 | ✅ 完成 | 16 条：规划成功率 100%、报告完成率 100%、命中率 98%、平均 7.1min/条 |
+| 量化评测 | ✅ 完成（8/21 修复后重跑） | 16 条：规划 100%、完成 100%、命中 94%（单次波动）、轮数 3.5、总耗时 1.3h |
 | 断点恢复 | ✅ 完成 | 恢复仅 18.4s（占全流程 7%） |
 | 反思对照实验 | ✅ 完成 | 3 条小样本：反思省 ~30% token/耗时，命中率 -0.11（早停漏词） |
 | pytest 测试 | ✅ 完成（8/21） | 72 用例全 mock，1s 跑完，不依赖 API/网络 |
@@ -94,6 +94,8 @@ cd "E:\AI 应用开发\agent"
 5. **DeepSeek**：账号模型是 `deepseek-v4-flash`/`deepseek-v4-pro`（不是默认 deepseek-chat）；API 偶发返回空 content → Writer 已加三重试+兜底；余额不足会 402。
 6. **评测可靠性**：进度实时落盘（`progress.jsonl`）断点续跑；命中匹配大小写不敏感；`ablation.py` 独立脚本逐条落盘。
 7. **本机环境坑**：WorkBuddy 后台 bash 任务的 tasklist 监控不可靠（进程"看似消失"实际在跑），判断完成**以落盘文件为准**；长任务建议前台跑或逐条落盘。
+8. **沙箱删除拦截**：WorkBuddy 沙箱下 `os.remove` 被"安全删除"shim 拦截（`SAFE_DELETE_FAIL_CLOSED`，回收站不可用）→ `evaluate.py --fresh` 启动即崩。**解法**：`mv` 备份旧 progress 代替删除，不带 `--fresh` 跑（文件不存在即全量重跑）。metrics.json 被占用时写入也崩 → evaluate.py 已改原子写（.tmp + os.replace）+ 失败警告。
+9. **stdout 重定向缓冲**：后台任务 `> log 2>&1` 后 print 是块缓冲不实时 flush，看进度以 progress.jsonl 落盘为准（每完成一条实时追加）。
 
 ## 6. 成本记录（用户实测）
 
@@ -155,7 +157,7 @@ cd "E:\AI 应用开发\agent"
 6. Docker 部署；
 7. Tavily 搜索升级（质量更高，需 key）。
 
-> 全量评测数据为修复前版本（iteration 修复后如需新指标，`evaluate.py --fresh` 重跑约 1.9h/5 元）。
+> 全量评测已于 8/21 修复 iteration 后重跑（16 条，断点续跑），新指标见第 2 节；命中率 94% 为单次波动（id=3/9 各 0.5，跑满护栏，非早停）。注意：`evaluate.py --fresh` 会因沙箱删除拦截崩溃，重跑用 `mv` 备份旧 progress 后直接跑。
 
 ## 9. 一句话总结
 

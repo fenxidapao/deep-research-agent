@@ -204,8 +204,14 @@ def main():
         extra["ablation"] = rows
 
     out = {"metrics": metrics, "detail": results, **extra}
-    with open("eval_set/metrics.json", "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
+    try:
+        # 原子写：先写 .tmp 再替换，避免直接覆盖目标被占用/沙箱拦截时崩溃（8/21 实测踩坑）
+        tmp = "eval_set/metrics.json.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, "eval_set/metrics.json")
+    except OSError as e:
+        print(f"警告: metrics.json 写入失败（{e}）；评测数据已保留在 progress.jsonl，可手工恢复", file=sys.stderr)
 
     print("=" * 50)
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
