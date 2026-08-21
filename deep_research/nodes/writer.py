@@ -37,9 +37,10 @@ def writer_node(cfg: Config, counter=None):
                 break
             logger.warning("Writer 第 %d 次输出过短(%d 字)，重试", attempt + 1, len(report))
         if len(report) < 50:
-            # 兜底：直接输出研究笔记原文，保证报告不为空
+            # 兜底：输出研究笔记原文（轻量 Markdown 化），保证报告不为空
             logger.error("Writer 三次重试仍失败，使用研究笔记原文兜底")
-            report = f"（自动报告生成失败，以下为研究笔记原文）\n\n{notes[: cfg.max_report_length]}"
+            notes_body = notes[: cfg.max_report_length]
+            report = f"（自动报告生成失败，以下为研究笔记原文整理）\n\n# 研究笔记汇总\n\n{notes_body}"
         return {"final_report": report, "status": "complete"}
 
     return node

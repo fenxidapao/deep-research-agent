@@ -38,6 +38,7 @@
 - ✅ supervisor 并行研究：一批步骤分发多个 worker 并行执行，单 worker 失败不影响整体（`--supervisor`）
 - ✅ 断点续跑：`thread_id` 维度 Checkpoint，长任务中断可恢复
 - ✅ 防重复搜索：`search_history` 状态跟踪，避免同一关键词反复搜
+- ✅ 注入防护：Planner/Reflector/Writer/Executor 提示词内置注入指令忽略规则（评测集含安全用例 #17）
 - ✅ 预算护栏：步骤数/循环轮数/单步搜索次数硬上限，防止失控
 - ✅ 经验沉淀：执行失败教训写入本地 JSON，同类任务下次规划时自动规避
 - ✅ 中文优先：针对国内环境优化（Bing 搜索、中文提示词、DeepSeek 模型）
@@ -95,8 +96,8 @@ curl -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{
 | 单任务 token 消耗 | 本次未捕获（评测收尾进程异常退出） | 约 21~32 万 |
 | 断点恢复 | 中断后恢复仅需 18.4s（占全流程 7%，无需重跑研究过程） | 同 |
 
-> 说明：重跑后 14/16 条关键词全命中；id=3（兴趣）/id=9（健康）各 0.5（未全命中），均跑满 5 步 + 护栏强制收尾，属 LLM 输出随机性的单次样本波动（temperature=0.3，非早停漏词）。**循环轮数 3.1→3.5 是 iteration 修复的预期效果**（修复前 replan 重置计数导致轮数被低估）；耗时下降 31% 主要来自 Bing 响应波动。
-> 评测中暴露并修复的问题：DeepSeek API 偶发空输出 → Writer 三重试兜底；CodeAgent 代码执行超时默认 30s 不足 → 放宽至 180s；iteration 被 planner 重置 → 重规划保留计数（护栏恢复生效）。
+> 说明：重跑后 14/16 条关键词全命中；id=3（兴趣）/id=9（健康）各 0.5（未全命中），均跑满 5 步 + 护栏强制收尾，属 LLM 输出随机性的单次样本波动（temperature=0.3，非早停漏词）。**循环轮数 3.1→3.5 是 iteration 修复的预期效果**（修复前 replan 重置计数导致轮数被低估）；耗时下降 31% 主要来自 Bing 响应波动。评测集已扩展至 17 条（含 #17 注入安全用例，待重跑出数据）。
+> 评测中暴露并修复的问题：DeepSeek API 偶发空输出 → Writer 三重试兜底；CodeAgent 代码执行超时默认 30s 不足 → 放宽至 180s；iteration 被 planner 重置 → 重规划保留计数（护栏恢复生效）；agent 直接 import urllib 被沙箱拒绝导致步骤触顶 → 提示词强制用 fetch_page 工具；提示词注入 → 四节点内置忽略规则。
 
 ### 反思前后对照（ablation，3 条小样本）
 
@@ -139,6 +140,8 @@ curl -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{
 | Reflector 输出异常 | 默认 continue，不中断流程 |
 | 单步执行异常 | 记录失败原因，交由 Reflector 决定重规划或跳过 |
 | 搜索失败/解析失败 | 返回可读错误文案，CodeAgent 自行换词重试 |
+| **提示词注入** | 四节点提示词内置忽略规则；评测集含安全用例 #17（伪装注入指令） |
+| **沙箱误用** | Executor 提示词强制"抓网页用 fetch_page 工具，禁止 import urllib/requests"（实测曾因 urllib 被拒导致步骤触顶） |
 
 ### 成本控制
 

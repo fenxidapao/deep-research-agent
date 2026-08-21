@@ -24,6 +24,7 @@ LangGraph 编排 + smolagents 内核的「规划-执行-反思」三节点深度
 | 经验沉淀 | ✅ 完成（8/21） | 失败→落盘→Planner 注入（`memory.py`，含闭环） |
 | supervisor 多 Agent | ✅ 完成（8/21） | 一批步骤并行分发 worker（`supervisor.py`，CLI `--supervisor`） |
 | iteration 缺陷修复 | ✅ 完成（8/21） | 重规划保留 iteration，max_iterations 护栏恢复生效 |
+| 安全加固 | ✅ 完成（8/21） | 四节点注入防护 + Executor 工具引导（urllib 禁用手写）+ 评测集加安全用例 #17 |
 | 文档 | ✅ | README（含生产化设计章节）+ 技术博客 + 交接文档 |
 | GitHub | ✅ | `master` 最新 `c81d656`，14 个 commit |
 
