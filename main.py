@@ -1,4 +1,4 @@
-"""CLI 入口：python main.py "调研问题" [--model deepseek|ollama] [--search bing|tavily] [--json]"""
+"""CLI 入口：python main.py "调研问题" [--model deepseek|ollama] [--search bing|tavily] [--supervisor] [--json]"""
 
 import argparse
 import json
@@ -12,9 +12,9 @@ from deep_research.logging_utils import get_logger, setup_logging
 logger = get_logger("cli")
 
 
-def run(task: str, verbose: bool = True) -> dict:
+def run(task: str, verbose: bool = True, supervisor: bool = False) -> dict:
     cfg = get_config()
-    graph = build_graph(cfg)
+    graph = build_graph(cfg, supervisor=supervisor)
     thread_id = f"run-{int(time.time())}"
 
     t0 = time.time()
@@ -46,6 +46,7 @@ def main():
     parser.add_argument("task", help="调研问题")
     parser.add_argument("--model", choices=["deepseek", "ollama"], default=None, help="模型 provider（默认读 .env）")
     parser.add_argument("--search", choices=["bing", "tavily"], default=None, help="搜索 provider（默认读 .env）")
+    parser.add_argument("--supervisor", action="store_true", help="supervisor 模式：一批步骤并行分发多个 worker")
     parser.add_argument("--json", action="store_true", help="输出 JSON（供脚本/评测使用）")
     args = parser.parse_args()
 
@@ -55,7 +56,7 @@ def main():
         os.environ["SEARCH_PROVIDER"] = args.search
 
     try:
-        result = run(args.task)
+        result = run(args.task, supervisor=args.supervisor)
     except ValueError as e:
         logger.error("配置错误: %s", e)
         sys.exit(1)

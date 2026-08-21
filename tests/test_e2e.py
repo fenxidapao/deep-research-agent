@@ -88,3 +88,25 @@ def test_end_to_end_replan_routing(monkeypatch):
     assert final["status"] == "complete"
     assert final["final_report"].startswith("这是一份端到端测试")
     assert fake.calls == 5  # replan 循环真实发生
+
+
+def test_end_to_end_supervisor_mode(monkeypatch):
+    """supervisor 模式全链路：并行分发一批步骤 → 汇总 → 报告。"""
+    fake = FakeModel([PLAN_JSON, REPORT])
+
+    def fake_run(cfg, counter, brief, task, step, history, memory=None):
+        return f"模拟笔记：{step['description']}", step.get("queries", [])
+
+    monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+    monkeypatch.setattr("deep_research.nodes.supervisor.run_single_step", fake_run)
+
+    graph = build_graph(Config(max_parallel_workers=2), reflect=False, supervisor=True)
+    final = graph.invoke(
+        {"task": "测试任务"},
+        config={"configurable": {"thread_id": "e2e-supervisor"}},
+    )
+
+    assert final["status"] == "complete"
+    assert final["final_report"].startswith("这是一份端到端测试")
+    assert len(final["completed_steps"]) == 2  # 两个步骤一批并行完成
+    assert fake.calls == 2  # planner + writer（worker 走 mock 的 run_single_step）

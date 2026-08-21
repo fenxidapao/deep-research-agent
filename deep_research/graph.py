@@ -21,6 +21,7 @@ from .model import UsageCounter
 from .nodes.executor import executor_node
 from .nodes.planner import planner_node
 from .nodes.reflector import reflector_node
+from .nodes.supervisor import supervisor_node
 from .nodes.writer import writer_node
 from .state import ResearchState
 
@@ -51,19 +52,21 @@ def _sequential_reflector_node(cfg: Config):
     return node
 
 
-def build_graph(cfg: Config, reflect: bool = True, counter: Optional[UsageCounter] = None):
+def build_graph(cfg: Config, reflect: bool = True, supervisor: bool = False, counter: Optional[UsageCounter] = None):
     """构建并编译 LangGraph（含 MemorySaver 断点续跑 + token 计数）。
 
     reflect=False 时启用无反思对照版（用于"反思前后对比"评测）。
+    supervisor=True 时用 Supervisor 节点替代 Executor：一批步骤并行分发给多个 worker。
     编译后的图对象带有 .usage_counter 属性（UsageCounter），可读取累计 token。
     """
     counter = counter or UsageCounter()
     reflect_node = reflector_node(cfg, counter) if reflect else _sequential_reflector_node(cfg)
+    exec_node = supervisor_node(cfg, counter) if supervisor else executor_node(cfg, counter)
 
     graph = StateGraph(ResearchState)
 
     graph.add_node("planner", planner_node(cfg, counter))
-    graph.add_node("executor", executor_node(cfg, counter))
+    graph.add_node("executor", exec_node)
     graph.add_node("reflector", reflect_node)
     graph.add_node("writer", writer_node(cfg, counter))
 

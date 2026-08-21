@@ -35,6 +35,7 @@
 ## 特性
 
 - ✅ 三节点循环：Plan → Execute → Reflect，Reflector 可触发**重规划**（replan）修正方向
+- ✅ supervisor 并行研究：一批步骤分发多个 worker 并行执行，单 worker 失败不影响整体（`--supervisor`）
 - ✅ 断点续跑：`thread_id` 维度 Checkpoint，长任务中断可恢复
 - ✅ 防重复搜索：`search_history` 状态跟踪，避免同一关键词反复搜
 - ✅ 预算护栏：步骤数/循环轮数/单步搜索次数硬上限，防止失控
@@ -61,6 +62,9 @@ cp .env.example .env
 ```bash
 # 换模型 / 换搜索源
 python main.py "对比 DeepSeek-V3 与 GPT-4o" --model deepseek --search bing
+
+# supervisor 并行模式（一批步骤多个 worker 并行研究，MAX_PARALLEL_WORKERS 控制并发）
+python main.py "2026 年 AI 行业十大趋势" --supervisor
 
 # 脚本化输出（JSON）
 python main.py "星露谷物语 1.6 新增内容" --json
@@ -161,6 +165,17 @@ Executor 执行失败 → 写入 memory/experiences.json → 下次同类任务 
 - 检索：关键词 n-gram 重叠打分，取 top-3 注入提示词
 - 路径可配：`MEMORY_FILE`（默认 `memory/experiences.json`，已 gitignore）
 
+### 并行研究（supervisor 模式）
+
+```
+Planner 拆解步骤 → Supervisor 取一批（≤ max_parallel_workers）→ 多个 worker 并行研究 → 汇总 → Reflector 照常评估
+```
+
+- `build_graph(cfg, supervisor=True)` 或 CLI `--supervisor`；默认单步 Executor 路径不变
+- worker 复用 `run_single_step`（与单步同逻辑，行为一致）；单 worker 失败隔离为失败笔记并沉淀经验，不影响整批
+- 并发安全：`UsageCounter` / `ExperienceMemory` 内部加锁，token 统计与经验落盘不丢
+- 并发数可配：`MAX_PARALLEL_WORKERS`（默认 3）。注意：搜索源并发过大会触发限流，按需调低
+
 ### 测试
 
 ```bash
@@ -182,7 +197,8 @@ agent/
 │   ├── memory.py           # 经验沉淀（JSON 落盘 + 关键词检索）
 │   └── nodes/
 │       ├── planner.py      # 拆解任务为简报 + 步骤
-│       ├── executor.py     # smolagents CodeAgent 执行单步研究
+│       ├── executor.py     # 单步 CodeAgent 执行（run_single_step 公共函数）
+│       ├── supervisor.py   # supervisor 模式：一批步骤并行分发多个 worker
 │       ├── reflector.py    # 判定 continue/replan/complete
 │       └── writer.py       # 汇总笔记生成 Markdown 报告
 ├── tests/                  # 39 个 pytest 用例（全 mock，不调真实 API）

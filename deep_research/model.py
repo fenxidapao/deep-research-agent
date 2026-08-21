@@ -4,8 +4,10 @@
 smolagents>=1.26 使用 OpenAIModel（OpenAI 兼容 API 客户端）。
 
 支持 Token 用量统计：UsageCounter 包装模型，累计每次调用的 input/output tokens。
+Supervisor 并行模式下多个 worker 共享计数，内部加锁保证线程安全。
 """
 
+import threading
 from typing import Any, Optional
 
 from smolagents import OpenAIModel
@@ -17,9 +19,10 @@ logger = get_logger("model")
 
 
 class UsageCounter:
-    """累计模型调用产生的 token 用量（图内所有节点共享一个实例）。"""
+    """累计模型调用产生的 token 用量（图内所有节点共享一个实例，线程安全）。"""
 
     def __init__(self):
+        self._lock = threading.RLock()
         self.input_tokens = 0
         self.output_tokens = 0
 
@@ -28,8 +31,9 @@ class UsageCounter:
         return self.input_tokens + self.output_tokens
 
     def add(self, input_tokens: int, output_tokens: int) -> None:
-        self.input_tokens += input_tokens or 0
-        self.output_tokens += output_tokens or 0
+        with self._lock:
+            self.input_tokens += input_tokens or 0
+            self.output_tokens += output_tokens or 0
 
 
 class _CountingModel:

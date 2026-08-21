@@ -8,6 +8,7 @@ relevant() 注入相关经验 → 避免重蹈覆辙。
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -16,10 +17,14 @@ _STOPWORDS = {"的", "了", "在", "是", "与", "和", "等", "一个", "这个
 
 
 class ExperienceMemory:
-    """经验库：JSON 文件存储，支持追加、相关检索、损坏容错。"""
+    """经验库：JSON 文件存储，支持追加、相关检索、损坏容错（线程安全）。
+
+    Supervisor 并行模式下多个 worker 共享实例，add/persist 加锁防竞态。
+    """
 
     def __init__(self, path: str = "memory/experiences.json"):
         self.path = Path(path)
+        self._lock = threading.RLock()
         self._entries: list[dict] = []
         self.load()
 
@@ -27,40 +32,43 @@ class ExperienceMemory:
 
     def load(self) -> None:
         """读入全部经验；文件不存在/损坏时置空（不抛异常）。"""
-        if not self.path.exists():
-            return
-        try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                self._entries = [e for e in data if isinstance(e, dict)]
-        except (json.JSONDecodeError, OSError):
-            self._entries = []
+        with self._lock:
+            if not self.path.exists():
+                return
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    self._entries = [e for e in data if isinstance(e, dict)]
+            except (json.JSONDecodeError, OSError):
+                self._entries = []
 
     def persist(self) -> None:
         """原子落盘（写临时文件后替换），失败静默——经验丢失不影响主流程。"""
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".json.tmp")
-            tmp.write_text(
-                json.dumps(self._entries, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            tmp.replace(self.path)
-        except OSError:
-            pass
+        with self._lock:
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = self.path.with_suffix(".json.tmp")
+                tmp.write_text(
+                    json.dumps(self._entries, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                tmp.replace(self.path)
+            except OSError:
+                pass
 
     def add(self, domain: str, lesson: str, suggestion: str) -> None:
         """追加一条经验并落盘。"""
-        self._entries.append(
-            {
-                "id": len(self._entries) + 1,
-                "domain": domain,
-                "lesson": lesson,
-                "suggestion": suggestion,
-                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-        )
-        self.persist()
+        with self._lock:
+            self._entries.append(
+                {
+                    "id": len(self._entries) + 1,
+                    "domain": domain,
+                    "lesson": lesson,
+                    "suggestion": suggestion,
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+            self.persist()
 
     # ---------- 检索 ----------
 
@@ -99,5 +107,6 @@ class ExperienceMemory:
 
     def clear(self) -> None:
         """清空经验（测试/运维用）。"""
-        self._entries = []
-        self.persist()
+        with self._lock:
+            self._entries = []
+            self.persist()

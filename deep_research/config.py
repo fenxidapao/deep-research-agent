@@ -38,6 +38,9 @@ class Config:
     # ---- 经验沉淀 ----
     memory_file: str = field(default_factory=lambda: _env("MEMORY_FILE", "memory/experiences.json"))
 
+    # ---- 并行研究（supervisor 模式） ----
+    max_parallel_workers: int = field(default_factory=lambda: int(_env("MAX_PARALLEL_WORKERS", "3")))
+
 
 def get_config() -> Config:
     cfg = Config()

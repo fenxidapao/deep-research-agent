@@ -22,6 +22,7 @@ LangGraph 编排 + smolagents 内核的「规划-执行-反思」三节点深度
 | pytest 测试 | ✅ 完成（8/21） | 53 用例全 mock，1s 跑完，不依赖 API/网络 |
 | logging 化 | ✅ 完成（8/21） | 节点进出/模型调用/异常结构化日志（`logging_utils.py`） |
 | 经验沉淀 | ✅ 完成（8/21） | 失败→落盘→Planner 注入（`memory.py`，53 用例含闭环） |
+| supervisor 多 Agent | ✅ 完成（8/21） | 一批步骤并行分发 worker（`supervisor.py`，CLI `--supervisor`） |
 | 文档 | ✅ | README（含生产化设计章节）+ 技术博客 + 交接文档 |
 | GitHub | ✅ | `master` 最新 `ee3393c`，9 个 commit |
 
@@ -110,9 +111,9 @@ cd "E:\AI 应用开发\agent"
 
 | 项 | 原因 | 工作量 | 状态 |
 |---|---|---|---|
-| pytest 测试 | 工程化最硬证据，面试答"怎么保证质量" | 1-2h | ✅ 8/21 完成（53 用例） |
+| pytest 测试 | 工程化最硬证据，面试答"怎么保证质量" | 1-2h | ✅ 8/21 完成（60 用例） |
 | Memory 经验沉淀 | Agent 面试高频题"怎么记忆"；把反思/搜索失败经验写 JSON 下次读取 | 1-2h | ✅ 8/21 完成（`deep_research/memory.py`，失败→落盘→Planner 注入） |
-| 浅层 Multi-Agent | supervisor-worker 是高频面试题，照 langgraph-supervisor 做任务分发即可 | 2-4h | ⬜ 未做 |
+| 浅层 Multi-Agent | supervisor-worker 是高频面试题，照 langgraph-supervisor 做任务分发即可 | 2-4h | ✅ 8/21 完成（`supervisor.py`，不引依赖自研，worker 复用 run_single_step） |
 | logging | 代码观感，面试官翻代码看得出 | 1h | ✅ 8/21 完成（`logging_utils.py`） |
 
 ### 7.2 不值得做（面试官/简历视角 + 理由）
@@ -149,7 +150,7 @@ cd "E:\AI 应用开发\agent"
 2. **Reflector 阈值调优**（修复对照实验暴露的早停问题：complete 判定要求覆盖关键维度）——面试可讲的"迭代故事"；
 3. **CourseRAG 集成**（7.3，现成资产，0.5-1.5h）；
 4. ~~**Memory 经验沉淀**~~ ✅ 8/21 完成（`memory.py`，失败→落盘→Planner 注入）；
-5. 浅层 Multi-Agent supervisor（7.1）；
+5. ~~**浅层 Multi-Agent supervisor**~~ ✅ 8/21 完成（`supervisor.py`，CLI `--supervisor`）；
 6. Docker 部署；
 7. Tavily 搜索升级（质量更高，需 key）。
 
