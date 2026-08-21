@@ -95,14 +95,58 @@ cd "E:\AI 应用开发\agent"
 | 反思对照 3 条 | 约 1~1.5 元 |
 | 断点恢复测试单次 | 约 0.3 元 |
 
-## 7. 可选路线图（按价值排序）
+## 7. 扩展取舍判断（对照生产级 9 步流程 + RAG 集成可行性）
 
-1. **Reflector 阈值调优**（修复对照实验暴露的早停问题）：complete 判定要求覆盖关键维度，再跑对照验证命中率提升——这是当前最值得做的改进，也是面试可讲的"迭代故事"；
-2. Supervisor 多子 Agent 并行研究（计划书可选）；
-3. Chroma 长期记忆（Reflector 沉淀经验）；
-4. Docker 部署；
-5. Tavily 搜索升级（质量更高，需 key）。
+> 用户提供了一份「AI Agent 搭建全流程」9 步清单（定义/Context/Tools/Workflow/Memory/Harness/Evaluation/Loop/Multi-Agent）。
+> 定性：**生产级工程全景清单——价值在面试讲认知，不在逐条落地**。"什么都做但都是皮毛"不如"核心做深 + 讲清全景"。
 
-## 8. 一句话总结
+### 7.1 值得做（性价比排序）
 
-项目**主体已 100% 交付**（计划书 4 项交付物全齐，指标真实），剩余工作按第 4 节：补测试 + README 生产化章节 +（可选）logging/Docker，把"能跑的 demo"升级为"经得起面试问的落地项目"。
+| 项 | 原因 | 工作量 |
+|---|---|---|
+| pytest 测试 | 工程化最硬证据，面试答"怎么保证质量" | 1-2h |
+| Memory 经验沉淀 | Agent 面试高频题"怎么记忆"；把反思/搜索失败经验写 JSON 下次读取 | 1-2h |
+| 浅层 Multi-Agent | supervisor-worker 是高频面试题，照 langgraph-supervisor 做任务分发即可 | 2-4h |
+| logging | 代码观感，面试官翻代码看得出 | 1h |
+
+### 7.2 不值得做（面试官/简历视角 + 理由）
+
+| 项 | 为什么不做 |
+|---|---|
+| 工具权限审批/人工确认 | 无真实敏感场景，为做而做；面试官一问"审批什么"就露馅 |
+| Loop 定时触发/任务调度 | 运维场景，简历展示不出价值，追问"调度失败怎么办"进坑 |
+| 人工修改率/用户满意度 | 无真实用户，无法产生数据，硬写是必被戳穿的破绽 |
+| 深度 Multi-Agent（消息队列/服务发现/负载均衡） | 分布式系统范畴，做不动讲不清，深挖即露怯 |
+| 硬加 RAG | 与搜索能力重叠，除非有现成资产与场景（见 7.3） |
+| Workflow 模板 | 单一用途研究 agent 意义不大 |
+
+### 7.3 CourseRAG 集成可行性（已有现成资产，结论：值得，走最小集成）
+
+**现状**（E:\WorkBuddy工作空间\2026-08-16-17-06-49\CourseRAG，8/16-8/20 迭代）：
+- 技术栈：Ollama nomic-embed-text（本地 embedding）+ chromadb + **混合检索（向量+自研 BM25+RRF）** + 可选 bge-reranker-v2-m3 两段式重排
+- 数据：12 份课程文档（数据结构/组成原理/操作系统/数据库/计网），支持 md/pdf/docx
+- **自带 FastAPI 服务**（main.py）：`POST /retrieve`（仅检索+重排，不生成——集成正用这个端点）、`/query`、文档管理、索引重建、`/health`
+- 自带四指标自评测（faithfulness/answer_relevancy/context_precision/context_recall）
+
+**集成方案（推荐 HTTP 解耦，零侵入）**：
+1. RAG 起服务：`uvicorn main:app --port 8001`（需本机 Ollama 运行，embedding 依赖它）
+2. Agent 侧新增 `course_retrieve` 工具（smolagents Tool，requests POST /retrieve），挂到 Executor 的 CodeAgent
+3. 提示词告知 CodeAgent：研究题目涉及课程内容时优先查本地库
+4. 工作量：0.5-1.5h；风险：Ollama 服务必须起（demo/评测多一个依赖）
+
+**面试价值**：这是"RAG + Agent"组合故事——两个独立项目整合成"研究 Agent 的私有知识库工具"，且 RAG 的混合检索/reranker/四指标评测全是经典面试考点，用户有真实实现与数据。
+**注意**：别让 RAG 喧宾夺主，Agent 是主角、RAG 是工具之一；评测可加 2-3 条课程题对比"纯 web 搜索 vs web+RAG"命中率，作为组合价值的量化证明。
+
+## 8. 可选路线图（按价值排序）
+
+1. **pytest 测试**（第 4.2 节，落地感最硬证据）；
+2. **Reflector 阈值调优**（修复对照实验暴露的早停问题：complete 判定要求覆盖关键维度）——面试可讲的"迭代故事"；
+3. **CourseRAG 集成**（7.3，现成资产，0.5-1.5h）；
+4. Memory 经验沉淀（7.1）；
+5. 浅层 Multi-Agent supervisor（7.1）；
+6. Docker 部署；
+7. Tavily 搜索升级（质量更高，需 key）。
+
+## 9. 一句话总结
+
+项目**主体已 100% 交付**（计划书 4 项交付物全齐，指标真实），剩余工作按第 4 节与第 7 节取舍：**pytest + Reflector 调优 +（可选）RAG 集成**，把"能跑的 demo"升级为"经得起面试问的落地项目"。
