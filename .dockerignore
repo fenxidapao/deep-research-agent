@@ -1,0 +1,19 @@
+# 构建上下文排除：瘦身 + 防密钥/本地数据误入镜像
+.venv/
+.env
+*.env
+.git/
+.gitignore
+.workbuddy/
+__pycache__/
+*.pyc
+.pytest_cache/
+eval_set/
+tests/
+memory/
+.checkpoints/
+*.log
+docs/
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -78,6 +78,10 @@ python evaluate.py --fresh             # 清空进度重跑全部
 # FastAPI 服务
 uvicorn api:app --port 8000
 curl -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{"task": "..."}'
+
+# Docker 部署（需本机装 Docker；方案与验证清单见 docs/DOCKER.md）
+docker compose up -d
+curl http://localhost:8000/health
 ```
 
 ## 评测结果

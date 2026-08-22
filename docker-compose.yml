@@ -1,0 +1,26 @@
+# Deep Research Agent API —— 一键起服务
+# 用法：docker compose up -d
+services:
+  research-api:
+    build: .
+    image: deep-research-agent:latest
+    container_name: deep-research-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env                       # 复用本地配置（DEEPSEEK_API_KEY 等，不进镜像）
+    environment:
+      MODEL_PROVIDER: deepseek
+      SEARCH_PROVIDER: bing
+    volumes:
+      - research-memory:/app/memory   # 经验沉淀持久化（容器重建不丢）
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  research-memory:
