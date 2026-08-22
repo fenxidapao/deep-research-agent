@@ -23,3 +23,4 @@ memory/
 .vscode/
 eval_set/progress.backup*.jsonl
 eval_set/ablation*.jsonl
+eval_set/docker_*.json
