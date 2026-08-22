@@ -82,8 +82,19 @@ class TestDecisionParsing:
         monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
         node = reflector_node(_cfg())
         out = node({"task": "t", "plan": [{"id": 1, "description": "d", "queries": []}],
-                    "current_step": 0, "iteration": 0})
+                    "current_step": 1, "iteration": 0, "completed_steps": ["步骤1"]})  # 已执行过步骤
         assert out["status"] == "complete"
+
+    def test_complete_with_zero_steps_downgraded(self, monkeypatch):
+        """P-1 护栏：计划非空却一步未执行就判定 complete → 强制 continue。"""
+        payload = json.dumps({"decision": "complete", "reason": "信息足够", "gap": ""}, ensure_ascii=False)
+        fake = FakeModel([payload])
+        monkeypatch.setattr("deep_research.model.build_model", lambda *a, **k: fake)
+        node = reflector_node(_cfg())
+        out = node({"task": "t", "plan": [{"id": 1, "description": "d", "queries": []}],
+                    "current_step": 0, "iteration": 0})  # 无 completed_steps
+        assert out["status"] == "running"  # 护栏降级为 continue
+        assert "护栏" in out["reflection"]
 
     def test_invalid_decision_defaults_continue(self, monkeypatch):
         payload = json.dumps({"decision": "whatever", "reason": "", "gap": ""}, ensure_ascii=False)

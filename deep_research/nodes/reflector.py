@@ -70,6 +70,13 @@ def reflector_node(cfg: Config, counter=None):
             decision = "continue"
             data = {"reason": f"反思解析失败，默认继续: {e}", "gap": ""}
 
+        # 代码护栏（P-1）：计划非空却一步未执行就判定 complete → 强制 continue。
+        # 防极端早停（模型"信息足够"误判），不伤正常早停的效率（ablation 已证早停省 token）。
+        if decision == "complete" and plan and not done:
+            logger.warning("护栏: 未执行任何步骤即判定 complete，降级为 continue")
+            decision = "continue"
+            data = {"reason": f"护栏降级：尚未执行任何步骤即判定 complete（{data.get('reason', '')}）", "gap": ""}
+
         logger.info("反思决策=%s 理由=%s", decision, data.get("reason", "")[:100])
 
         return {

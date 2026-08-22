@@ -22,3 +22,4 @@ memory/
 .idea/
 .vscode/
 eval_set/progress.backup*.jsonl
+eval_set/ablation*.jsonl
