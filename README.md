@@ -41,6 +41,7 @@
 - ✅ 注入防护：Planner/Reflector/Writer/Executor 提示词内置注入指令忽略规则（评测集含安全用例 #17）
 - ✅ 预算护栏：步骤数/循环轮数/单步搜索次数硬上限，防止失控
 - ✅ 经验沉淀：执行失败教训写入本地 JSON，同类任务下次规划时自动规避
+- ✅ 私有知识库集成：可选挂载 `course_retrieve` 工具（HTTP 调用 CourseRAG `/retrieve`），课程题优先查本地库，服务不可达自动降级 web_search（配置见 `.env.example` 的 `RAG_BASE_URL`）
 - ✅ 中文优先：针对国内环境优化（Bing 搜索、中文提示词、DeepSeek 模型）
 
 ## 快速启动
