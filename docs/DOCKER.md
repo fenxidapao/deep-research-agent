@@ -50,13 +50,16 @@ curl -X POST http://localhost:8000/run \
 4. **日志**：容器 stdout/stderr 由 Docker 收集（`docker logs`），项目 logging 已结构化，可直接接 ELK/Loki。
 5. **安全**：镜像不含 .env；`/run` 无鉴权——生产须前置网关/API Key。
 
-## 6. 验证清单（本机装 Docker 后执行）
+## 6. 验证清单（2026-08-22 已实测通过 ✅）
 
 ```bash
-docker build -t deep-research-agent:latest .   # 构建通过
-docker compose config                           # compose 语法校验
-docker compose up -d && docker compose ps       # 容器健康
-curl -s http://localhost:8000/health            # {"status":"ok"}
+docker build -t deep-research-agent:latest .   # ✅ 通过（加速器 docker.xuanyuan.me）
+docker compose config                           # ✅ 语法通过
+docker compose up -d && docker compose ps       # ✅ 容器 Up (healthy)
+curl -s http://localhost:8000/health            # ✅ {"status":"ok","provider":"deepseek","search":"bing"}
 curl -s -X POST http://localhost:8000/run -H "Content-Type: application/json" -d '{"task":"Python 3.13 新特性"}' | head -c 200
-docker compose down                             # 清理（卷保留）
+# ✅ status=complete，178.7s 出报告（容器内 DeepSeek+Bing 出站正常）
+docker compose down                             # 停止（卷保留）；restart: unless-stopped 已设
 ```
+
+> 国内网络注意：Docker Hub 直连超时，已配 `registry-mirrors`（docker.xuanyuan.me / docker.1ms.run / dockerproxy.net）。数据目录建议迁 E 盘：Settings → Resources → Advanced → Disk image location。
