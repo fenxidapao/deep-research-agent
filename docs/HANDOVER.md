@@ -26,6 +26,7 @@ LangGraph 编排 + smolagents 内核的「规划-执行-反思」三节点深度
 | iteration 缺陷修复 | ✅ 完成（8/21） | 重规划保留 iteration，max_iterations 护栏恢复生效 |
 | 安全加固 | ✅ 完成（8/21） | 四节点注入防护 + Executor 工具引导（urllib 禁用手写）+ 评测集加安全用例 #17 |
 | 工具调用埋点 | ✅ 完成（8/22） | 工具层线程安全统计（calls/fail/no_result），评测/CLI 输出（T-3） |
+| Reflector 早停修复 | ✅ 完成（8/22） | complete 门槛提高 + 零步骤护栏；ablation 实测 #1 0.67→1.0 |
 | 文档 | ✅ | README（含生产化设计章节）+ 技术博客 + 交接文档 |
 | GitHub | ✅ | `master` 最新 `c81d656`，14 个 commit |
 
@@ -152,7 +153,7 @@ cd "E:\AI 应用开发\agent"
 ## 8. 可选路线图（按价值排序）
 
 1. ~~**pytest 测试**~~ ✅ 8/21 完成（72 用例全绿）；
-2. ~~**iteration 缺陷修复**~~ ✅ 8/21 完成（重规划保留轮数，护栏恢复）；**Reflector 早停调优仍可选**（ablation 暴露的 #1 命中 0.67，complete 判定要求覆盖关键维度）；
+2. ~~**iteration 缺陷修复**~~ ✅ 8/21 完成（重规划保留轮数，护栏恢复）；~~**Reflector 早停调优**~~ ✅ 8/22 完成（complete 门槛提高 + 零步骤护栏，ablation 实测 #1 0.67→1.0；#15 出现随机波动，小样本无法归因）；
 3. **CourseRAG 集成**（7.3，现成资产，0.5-1.5h）；
 4. ~~**Memory 经验沉淀**~~ ✅ 8/21 完成（`memory.py`，失败→落盘→Planner 注入）；
 5. ~~**浅层 Multi-Agent supervisor**~~ ✅ 8/21 完成（`supervisor.py`，CLI `--supervisor`）；
@@ -163,4 +164,4 @@ cd "E:\AI 应用开发\agent"
 
 ## 9. 一句话总结
 
-项目**已按"完整落地"标准定稿**（8/21）：72 个 pytest 全绿 + README 生产化设计 + logging + 经验沉淀 + supervisor 并行 + iteration 护栏修复，commit `c81d656`（待推 iteration 修复 commit）。剩余均为可选：Docker 部署、Reflector 早停调优、CourseRAG 集成。全量评测数据为修复前版本，如需新指标 `evaluate.py --fresh` 重跑。
+项目**已按"完整落地"标准定稿**（8/22）：82 个 pytest 全绿 + README 生产化设计 + logging + 经验沉淀 + supervisor 并行 + iteration 护栏修复 + 安全加固 + 工具埋点 + Reflector 早停修复，commit `b0ee49a`（P-1 验证结果已更新）。剩余可选：Docker 部署、CourseRAG 集成、全量 17 条评测重跑（含安全用例，5-6 元/1.5h）。
