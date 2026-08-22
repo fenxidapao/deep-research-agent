@@ -26,6 +26,11 @@ class Config:
     search_provider: str = field(default_factory=lambda: _env("SEARCH_PROVIDER", "bing"))
     tavily_api_key: str = field(default_factory=lambda: _env("TAVILY_API_KEY", ""))
 
+    # ---- 私有知识库（CourseRAG 集成） ----
+    rag_base_url: str = field(default_factory=lambda: _env("RAG_BASE_URL", "http://127.0.0.1:8001"))
+    rag_timeout: int = field(default_factory=lambda: int(_env("RAG_TIMEOUT", "20")))
+    rag_top_k: int = field(default_factory=lambda: int(_env("RAG_TOP_K", "5")))
+
     # ---- 预算 ----
     max_plan_steps: int = field(default_factory=lambda: int(_env("MAX_PLAN_STEPS", "6")))
     max_iterations: int = field(default_factory=lambda: int(_env("MAX_ITERATIONS", "4")))

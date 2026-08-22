@@ -3,6 +3,7 @@
 import requests
 
 from deep_research.tools import (
+    CourseRetrieveTool,
     FetchPageTool,
     WebSearchTool,
     _clean_html,
@@ -157,3 +158,93 @@ class TestToolStats:
         WebSearchTool(provider="bing").forward("a")
         reset_tool_stats()
         assert all(v["calls"] == 0 for v in get_tool_stats().values())
+
+
+# ---------- CourseRAG 集成工具（course_retrieve） ----------
+
+
+class _FakeJsonResp:
+    """假 requests.Response：返回预置 JSON（.json() 供工具消费）。"""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+RETRIEVE_HITS = {
+    "query": "什么是红黑树",
+    "mode": "accurate",
+    "docs": [
+        {
+            "rank": 1,
+            "source": "数据结构笔记.md",
+            "content": "红黑树是一种自平衡二叉查找树，性质包括根为黑、红节点的子节点为黑…",
+            "score": 0.8123,
+            "start_index": 120,
+        },
+        {
+            "rank": 2,
+            "source": "数据结构笔记.md",
+            "content": "插入时通过旋转与变色维持平衡…",
+            "score": 0.6543,
+            "start_index": 800,
+        },
+    ],
+}
+
+RETRIEVE_EMPTY = {"query": "x", "mode": "accurate", "docs": []}
+
+
+class TestCourseRetrieve:
+    def test_hits_formatted_with_source_and_score(self, monkeypatch):
+        monkeypatch.setattr("deep_research.tools.requests.post", lambda *a, **k: _FakeJsonResp(RETRIEVE_HITS))
+        out = CourseRetrieveTool(base_url="http://127.0.0.1:8001").forward("什么是红黑树")
+        assert "课程知识库命中 2 条" in out
+        assert "数据结构笔记.md" in out
+        assert "0.8123" in out
+        assert "红黑树是一种自平衡二叉查找树" in out
+
+    def test_respects_top_k(self, monkeypatch):
+        monkeypatch.setattr("deep_research.tools.requests.post", lambda *a, **k: _FakeJsonResp(RETRIEVE_HITS))
+        out = CourseRetrieveTool(base_url="http://127.0.0.1:8001", top_k=1).forward("q")
+        assert "[1] 来源" in out
+        assert "[2] 来源" not in out
+
+    def test_no_hits_message(self, monkeypatch):
+        monkeypatch.setattr("deep_research.tools.requests.post", lambda *a, **k: _FakeJsonResp(RETRIEVE_EMPTY))
+        out = CourseRetrieveTool().forward("无关问题")
+        assert "未命中" in out
+
+    def test_service_down_degrades_gracefully(self, monkeypatch):
+        def boom(*a, **k):
+            raise requests.ConnectionError("连接被拒绝")
+
+        monkeypatch.setattr("deep_research.tools.requests.post", boom)
+        out = CourseRetrieveTool(base_url="http://127.0.0.1:8001").forward("q")
+        assert "课程知识库检索失败" in out
+        assert "web_search" in out  # 提示降级路径
+
+    def test_stats_recorded(self, monkeypatch):
+        reset_tool_stats()
+        monkeypatch.setattr("deep_research.tools.requests.post", lambda *a, **k: _FakeJsonResp(RETRIEVE_HITS))
+        CourseRetrieveTool().forward("q")
+        s = get_tool_stats()["course_retrieve"]
+        assert s["calls"] == 1
+        assert s["fail"] == 0
+
+    def test_posts_accurate_mode_by_default(self, monkeypatch):
+        captured = {}
+
+        def fake_post(url, json=None, timeout=None):
+            captured["json"] = json
+            return _FakeJsonResp(RETRIEVE_EMPTY)
+
+        monkeypatch.setattr("deep_research.tools.requests.post", fake_post)
+        CourseRetrieveTool().forward("q")
+        assert captured["json"]["mode"] == "accurate"
+        assert captured["json"]["question"] == "q"

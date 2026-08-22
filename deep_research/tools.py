@@ -31,6 +31,7 @@ _BING_HEADERS = {
 TOOL_STATS = {
     "web_search": {"calls": 0, "fail": 0, "no_result": 0},
     "fetch_page": {"calls": 0, "fail": 0, "no_result": 0},
+    "course_retrieve": {"calls": 0, "fail": 0, "no_result": 0},
 }
 _STATS_LOCK = threading.Lock()
 
@@ -191,3 +192,68 @@ class FetchPageTool(Tool):
 
 def build_search_tools(search_provider: str, tavily_api_key: Optional[str]) -> list[Tool]:
     return [WebSearchTool(provider=search_provider, tavily_api_key=tavily_api_key), FetchPageTool()]
+
+
+class CourseRetrieveTool(Tool):
+    """私有知识库检索：调用 CourseRAG 服务的 /retrieve 端点（HTTP 解耦，零侵入）。
+
+    设计背景：
+    - Agent 是主角、RAG 是工具之一：研究题目涉及专业课知识（数据结构/组成原理/
+      操作系统/数据库/计网等）时优先查本地课程库，能拿到带来源的原文块；
+    - 走 HTTP 而非进程内导入，RAG 侧零改动，两个项目解耦部署；
+    - RAG 服务不可达时返回错误说明（CodeAgent 会自行决定降级到 web_search），
+      不阻塞主流程。
+    """
+
+    name = "course_retrieve"
+    description = (
+        "在私有课程知识库（数据结构/组成原理/操作系统/数据库/计算机网络等专业课）中检索问题，"
+        "返回命中的原文块、来源文件名与相关性分数。"
+        "当调研题目涉及专业课概念、术语定义、算法原理等课程内容时，优先使用本工具；"
+        "与 web_search 互补：课程内容查本地库更准，时事/外部信息用 web_search。"
+    )
+    inputs = {
+        "question": {"type": "string", "description": "检索问题（课程知识点，应具体）"},
+        "mode": {
+            "type": "string",
+            "enum": ["accurate", "fast"],
+            "nullable": True,
+            "description": "accurate=向量+BM25 混合+重排（更准，较慢）；fast=纯向量（秒级）；默认 accurate",
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, base_url: str = "http://127.0.0.1:8001", timeout: int = 20, top_k: int = 5):
+        super().__init__()
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.top_k = top_k
+
+    def forward(self, question: str, mode: str = "accurate") -> str:
+        _record("course_retrieve")
+        try:
+            resp = requests.post(
+                f"{self.base_url}/retrieve",
+                json={"question": question, "mode": mode},
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("CourseRAG 检索失败: %s", e)
+            _mark("course_retrieve", "fail")
+            return f"课程知识库检索失败: {e}（可降级用 web_search）"
+
+        docs = data.get("docs", [])
+        if not docs:
+            _mark("course_retrieve", "no_result")
+            return "课程知识库未命中相关内容，请改换措辞或用 web_search。"
+
+        lines = []
+        for d in docs[: self.top_k]:
+            source = d.get("source", "?")
+            score = d.get("score")
+            content = (d.get("content") or "").strip().replace("\n", " ")[:400]
+            score_str = f"{score:.4f}" if score is not None else "n/a"
+            lines.append(f"[{d.get('rank', 0)}] 来源: {source} | 相关度: {score_str}\n    内容: {content}")
+        return "课程知识库命中 " + str(len(docs)) + " 条：\n\n" + "\n\n".join(lines)
